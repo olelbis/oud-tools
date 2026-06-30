@@ -12,7 +12,12 @@ Semantic interpretation (e.g. WRITE vs READ) is left to the reader.
 Usage:
     python oud_lb_diagram.py <path-to-config.ldif>
     python oud_lb_diagram.py                        # looks for 'config.ldif' in cwd
+    python oud_lb_diagram.py --version               # print version and exit
+
+See CHANGELOG.md for version history.
 """
+
+__version__ = "1.1.0"
 
 import sys
 import re
@@ -433,6 +438,10 @@ def print_diagram(model):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] in ('--version', '-v'):
+        print(f'oud_lb_diagram.py v{__version__}')
+        sys.exit(0)
+
     path = sys.argv[1] if len(sys.argv) > 1 else 'config.ldif'
     try:
         entries = parse_ldif(path)
