@@ -18,7 +18,8 @@ import sys
 import re
 from collections import defaultdict
 
-W = 92  # diagram width
+MIN_W = 60   # minimum diagram width
+MAX_W = 200  # safety cap so a single rogue line can't blow up the layout
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LDIF PARSER
@@ -286,87 +287,78 @@ def render_tree(we_dn, model, prefix='', is_last=True):
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DIAGRAM
+#
+# Boxed sections (network groups / workflow-tree headers / backend servers /
+# legend) are built as plain text first, so the frame width can be computed
+# from actual content instead of a hardcoded constant. The workflow tree body
+# itself stays unframed (rendered separately, as before).
 # ─────────────────────────────────────────────────────────────────────────────
 
-def box_close():
-    print('└' + '─'*(W-2) + '┘')
+class Section:
+    """A titled box whose body lines are collected before being framed."""
+    def __init__(self, title):
+        self.title = title
+        self.lines = []
 
-def row(text):
-    print('│  ' + text.ljust(W-3) + '│')
+    def add(self, text=''):
+        self.lines.append(text)
 
-def print_diagram(model):
-    ngs  = model['network_groups']
-    wfs  = model['workflows']
-    exts = model['extensions']
-    pwe  = model['proxy_we']
+    def content_width(self):
+        widths = [len(self.title) + 2]  # "  TITLE"
+        widths += [len(l) + 2 for l in self.lines]  # "  line"
+        return max(widths) if widths else 0
 
-    # ── HEADER ───────────────────────────────────────────────────────────────
-    print()
-    print('╔' + '═'*(W-2) + '╗')
-    print('║' + ' OUD PROXY — LOAD BALANCING ARCHITECTURE '.center(W-2) + '║')
-    print('╚' + '═'*(W-2) + '╝')
-    print()
 
-    # ── NETWORK GROUPS ───────────────────────────────────────────────────────
-    print('┌' + '─'*(W-2) + '┐')
-    print('│' + '  NETWORK GROUPS'.ljust(W-2) + '│')
-    print('├' + '─'*(W-2) + '┤')
+def build_network_groups_section(model):
+    sec = Section('NETWORK GROUPS')
+    ngs = model['network_groups']
+    wfs = model['workflows']
     if not ngs:
-        row('(none found)')
+        sec.add('(none found)')
     for ng in sorted(ngs, key=lambda x: x.get('priority', '0')):
         wf_info = wfs.get(ng['workflow_dn'], {})
-        row(f'cn={ng["cn"]}  priority:{ng["priority"]}  enabled:{ng["enabled"]}'
-            f'  →  workflow:{cn_of(ng["workflow_dn"])}  base-dn:{wf_info.get("base_dn","?")}')
-    box_close()
-    print()
+        sec.add(f'cn={ng["cn"]}  priority:{ng["priority"]}  enabled:{ng["enabled"]}'
+                f'  →  workflow:{cn_of(ng["workflow_dn"])}  base-dn:{wf_info.get("base_dn","?")}')
+    return sec
 
-    # ── WORKFLOW TREES ────────────────────────────────────────────────────────
+
+def build_workflow_header_sections(model):
+    """One small header box per workflow tree (title only, body printed unframed)."""
+    sections = []
+    ngs = model['network_groups']
+    wfs = model['workflows']
     printed = set()
     for ng in sorted(ngs, key=lambda x: x.get('priority', '0')):
         wf_dn = ng['workflow_dn']
         if wf_dn in printed:
             continue
         printed.add(wf_dn)
+        wf_info = wfs.get(wf_dn, {})
+        base_dn = wf_info.get('base_dn', '?')
+        sec = Section(f'WORKFLOW TREE  —  {cn_of(wf_dn)}  —  base-dn: {base_dn}')
+        sections.append((wf_dn, wf_info, sec))
+    return sections
 
-        wf_info  = wfs.get(wf_dn, {})
-        base_dn  = wf_info.get('base_dn', '?')
-        entry_we = wf_info.get('entry_we_dn', '')
 
-        print('┌' + '─'*(W-2) + '┐')
-        print('│' + f'  WORKFLOW TREE  —  {cn_of(wf_dn)}  —  base-dn: {base_dn}'.ljust(W-2) + '│')
-        box_close()
-        print()
-
-        if not entry_we:
-            print('  [!] No entry workflow element found.')
-            print()
-            continue
-
-        render_tree(entry_we, model, prefix='  ', is_last=True)
-        print()
-
-    # ── BACKEND SERVERS TABLE ─────────────────────────────────────────────────
-    print('┌' + '─'*(W-2) + '┐')
-    print('│' + '  BACKEND SERVERS'.ljust(W-2) + '│')
-    print('├' + '─'*(W-2) + '┤')
-    hdr = f'  {"Extension":<10}  {"WE":<14}  {"IP Address":<18}  {"Port":<6}  {"SSL":<6}  {"Policy":<8}  {"Pool":<7}  Cred-mode'
-    print('│' + hdr.ljust(W-2) + '│')
-    print('├' + '─'*(W-2) + '┤')
+def build_backend_servers_section(model):
+    sec = Section('BACKEND SERVERS')
+    pwe  = model['proxy_we']
+    exts = model['extensions']
+    hdr = f'{"Extension":<10}  {"WE":<14}  {"IP Address":<18}  {"Port":<6}  {"SSL":<6}  {"Policy":<8}  {"Pool":<7}  Cred-mode'
+    sec.add(hdr)
+    sec.add('-' * len(hdr))
     for pwe_dn in sorted(pwe.keys(), key=lambda d: pwe[d]['cn']):
         p   = pwe[pwe_dn]
         ext = exts.get(p['extension_dn'], {})
-        r   = (f'  {ext.get("cn","?"):<10}  {p["cn"]:<14}  '
-               f'{ext.get("address","?"):<18}  {ext.get("port","?"):<6}  '
-               f'{ext.get("ssl_port","?"):<6}  {ext.get("ssl_policy","?"):<8}  '
-               f'{ext.get("pool_max","?"):<7}  {p.get("cred_mode","?")}')
-        print('│' + r.ljust(W-2) + '│')
-    box_close()
-    print()
+        sec.add(f'{ext.get("cn","?"):<10}  {p["cn"]:<14}  '
+                f'{ext.get("address","?"):<18}  {ext.get("port","?"):<6}  '
+                f'{ext.get("ssl_port","?"):<6}  {ext.get("ssl_policy","?"):<8}  '
+                f'{ext.get("pool_max","?"):<7}  {p.get("cred_mode","?")}')
+    return sec
 
-    # ── LEGEND ────────────────────────────────────────────────────────────────
-    print('┌' + '─'*(W-2) + '┐')
-    print('│' + '  LEGEND'.ljust(W-2) + '│')
-    print('├' + '─'*(W-2) + '┤')
+
+def build_legend_section():
+    sec = Section('LEGEND')
     for l in [
         'PROPORTIONAL   Distributes traffic by weight per operation type.',
         '               weights shown as  ops:value  —  e.g. add/modify/delete:1  search/bind:0',
@@ -376,8 +368,64 @@ def print_diagram(model):
         '└─ <node>      Leaf node = backend proxy WE resolved to IP:port.',
         'cred-mode      How client credentials are forwarded to the backend.',
     ]:
-        row(l)
-    box_close()
+        sec.add(l)
+    return sec
+
+
+def print_section(sec, w):
+    print('┌' + '─' * (w - 2) + '┐')
+    print('│' + ('  ' + sec.title).ljust(w - 2) + '│')
+    print('├' + '─' * (w - 2) + '┤')
+    for l in sec.lines:
+        print('│' + ('  ' + l).ljust(w - 2) + '│')
+    print('└' + '─' * (w - 2) + '┘')
+
+
+def print_header(w):
+    title = ' OUD PROXY — LOAD BALANCING ARCHITECTURE '
+    print()
+    print('╔' + '═' * (w - 2) + '╗')
+    print('║' + title.center(w - 2) + '║')
+    print('╚' + '═' * (w - 2) + '╝')
+    print()
+
+
+def print_diagram(model):
+    ngs_sec = build_network_groups_section(model)
+    wf_sections = build_workflow_header_sections(model)
+    backend_sec = build_backend_servers_section(model)
+    legend_sec = build_legend_section()
+
+    # Width is computed once from every boxed section, so all frames line up.
+    candidates = [ngs_sec.content_width(), backend_sec.content_width(), legend_sec.content_width()]
+    candidates += [sec.content_width() for _, _, sec in wf_sections]
+    title_width = len(' OUD PROXY — LOAD BALANCING ARCHITECTURE ') + 2
+    candidates.append(title_width)
+    # content_width() = len(longest "  line") . We need w-2 to be strictly
+    # greater than that, so the right border always has at least 1 space gap.
+    w = (max(candidates) if candidates else MIN_W) + 3
+    w = max(MIN_W, min(MAX_W, w))
+
+    print_header(w)
+
+    print_section(ngs_sec, w)
+    print()
+
+    for wf_dn, wf_info, sec in wf_sections:
+        print_section(sec, w)
+        print()
+        entry_we = wf_info.get('entry_we_dn', '')
+        if not entry_we:
+            print('  [!] No entry workflow element found.')
+            print()
+            continue
+        render_tree(entry_we, model, prefix='  ', is_last=True)
+        print()
+
+    print_section(backend_sec, w)
+    print()
+
+    print_section(legend_sec, w)
     print()
 
 # ─────────────────────────────────────────────────────────────────────────────
