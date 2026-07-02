@@ -54,7 +54,8 @@ Priority: H=High / M=Medium / L=Low
 | # | P | Item |
 |---|---|------|
 | C1 | M | Split `extract_model()` into focused functions (one per object type) |
-| C2 | L | Move Java class name fragments to named constants |
+| C2 | ~~L~~ | ~~Move Java class name fragments to named constants~~ → **done 1.3.1** |
+| C4 | ~~M~~ | ~~Backend table column widths are magic numbers duplicated between header and data row~~ → **done 1.3.1** |
 | C3 | L | Add basic unit tests for parser and model extraction |
 
 ---
@@ -83,3 +84,5 @@ Priority: H=High / M=Medium / L=Low
 | P2 | 1.2.0 | Release notes drafted for v1.2.0 |
 | D10 | 1.3.0 | `--output <file>` flag (F1) |
 | D11 | 1.3.0 | `--no-tree` flag (F2) |
+| D12 | 1.3.1 | Java class fragments extracted to named constants (C2) |
+| D13 | 1.3.1 | Backend table column widths extracted to named constants (C4) |

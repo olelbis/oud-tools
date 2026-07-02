@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.3.1] - 2026-07-02
+
+### Changed
+- **Code quality (no behaviour change).** Java class name fragments
+  (`LoadBalancingWorkflowElement`, `ProxyLdapWorkflowElement`,
+  `LDAPServerExtension`, algorithm type fragments) extracted to named
+  constants (`JC_*`, `ALGO_LABELS`) instead of inline string literals.
+- **Code quality (no behaviour change).** Backend servers table column
+  widths (`Extension`, `WE`, `IP Address`, `Port`, `SSL`, `Policy`, `Pool`)
+  extracted to named constants (`COL_*`), now defined once and shared
+  between the header row and data rows — previously duplicated literals
+  that could silently drift out of sync.
+
+---
+
 ## [1.3.0] - 2026-07-02
 
 ### Added

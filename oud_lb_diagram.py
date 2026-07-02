@@ -19,7 +19,7 @@ Usage:
 See CHANGELOG.md for version history.
 """
 
-__version__ = "1.3.0"
+__version__ = "1.3.1"
 
 import sys
 import re
@@ -143,22 +143,40 @@ def cn_of(dn):
     return m.group(1) if m else dn
 
 # ─────────────────────────────────────────────────────────────────────────────
+# JAVA CLASS CONSTANTS  (fragments matched against ds-cfg-java-class)
+# ─────────────────────────────────────────────────────────────────────────────
+
+JC_LOAD_BALANCING_WE = 'LoadBalancingWorkflowElement'
+JC_PROXY_LDAP_WE     = 'ProxyLdapWorkflowElement'
+JC_LDAP_SERVER_EXT   = 'LDAPServerExtension'
+
+JC_ALGO_PROPORTIONAL = 'Proportional'
+JC_ALGO_FAILOVER     = 'Failover'
+JC_ALGO_ROUND_ROBIN  = 'RoundRobin'
+
+ALGO_LABELS = {
+    JC_ALGO_PROPORTIONAL: 'PROPORTIONAL',
+    JC_ALGO_FAILOVER:     'FAILOVER',
+    JC_ALGO_ROUND_ROBIN:  'ROUND-ROBIN',
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # CLASSIFIERS
 # ─────────────────────────────────────────────────────────────────────────────
 
 def is_lb_we(entry):
-    return 'LoadBalancingWorkflowElement' in first(entry, 'ds-cfg-java-class')
+    return JC_LOAD_BALANCING_WE in first(entry, 'ds-cfg-java-class')
 
 def is_proxy_we(entry):
-    return 'ProxyLdapWorkflowElement' in first(entry, 'ds-cfg-java-class')
+    return JC_PROXY_LDAP_WE in first(entry, 'ds-cfg-java-class')
 
 def is_extension(entry):
-    return 'LDAPServerExtension' in first(entry, 'ds-cfg-java-class')
+    return JC_LDAP_SERVER_EXT in first(entry, 'ds-cfg-java-class')
 
 def algo_type(jc):
-    if 'Proportional' in jc: return 'PROPORTIONAL'
-    if 'Failover'     in jc: return 'FAILOVER'
-    if 'RoundRobin'   in jc: return 'ROUND-ROBIN'
+    for fragment, label in ALGO_LABELS.items():
+        if fragment in jc:
+            return label
     return jc.split('.')[-1]
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -431,20 +449,35 @@ def build_workflow_header_sections(model):
     return sections
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# BACKEND TABLE COLUMN WIDTHS  (single source of truth for header + rows)
+# ─────────────────────────────────────────────────────────────────────────────
+
+COL_EXTENSION = 10
+COL_WE        = 14
+COL_IP        = 18
+COL_PORT      = 6
+COL_SSL       = 6
+COL_POLICY    = 8
+COL_POOL      = 7
+
+
 def build_backend_servers_section(model):
     sec = Section('BACKEND SERVERS')
     pwe  = model['proxy_we']
     exts = model['extensions']
-    hdr = f'{"Extension":<10}  {"WE":<14}  {"IP Address":<18}  {"Port":<6}  {"SSL":<6}  {"Policy":<8}  {"Pool":<7}  Cred-mode'
+    hdr = (f'{"Extension":<{COL_EXTENSION}}  {"WE":<{COL_WE}}  {"IP Address":<{COL_IP}}  '
+           f'{"Port":<{COL_PORT}}  {"SSL":<{COL_SSL}}  {"Policy":<{COL_POLICY}}  '
+           f'{"Pool":<{COL_POOL}}  Cred-mode')
     sec.add(hdr)
     sec.add_separator()
     for pwe_dn in sorted(pwe.keys(), key=lambda d: pwe[d]['cn']):
         p   = pwe[pwe_dn]
         ext = exts.get(p['extension_dn'], {})
-        sec.add(f'{ext.get("cn","?"):<10}  {p["cn"]:<14}  '
-                f'{ext.get("address","?"):<18}  {ext.get("port","?"):<6}  '
-                f'{ext.get("ssl_port","?"):<6}  {ext.get("ssl_policy","?"):<8}  '
-                f'{ext.get("pool_max","?"):<7}  {p.get("cred_mode","?")}')
+        sec.add(f'{ext.get("cn","?"):<{COL_EXTENSION}}  {p["cn"]:<{COL_WE}}  '
+                f'{ext.get("address","?"):<{COL_IP}}  {ext.get("port","?"):<{COL_PORT}}  '
+                f'{ext.get("ssl_port","?"):<{COL_SSL}}  {ext.get("ssl_policy","?"):<{COL_POLICY}}  '
+                f'{ext.get("pool_max","?"):<{COL_POOL}}  {p.get("cred_mode","?")}')
     return sec
 
 
