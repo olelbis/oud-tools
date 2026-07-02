@@ -19,7 +19,7 @@ Usage:
 See CHANGELOG.md for version history.
 """
 
-__version__ = "1.5.0"
+__version__ = "1.5.1"
 
 import sys
 import re
@@ -680,10 +680,18 @@ def main():
         pass
 
     # B4 — warn on unresolved workflow-element DN references
+    # B6 — warn on network groups with no workflow reference at all
+    #      (distinct from B4: here ds-cfg-workflow is empty/missing, not
+    #      pointing at something nonexistent — the previous check silently
+    #      skipped this case because `if wf_dn and ...` short-circuits on
+    #      an empty string).
     all_we = set(model['lb_we']) | set(model['proxy_we'])
     for ng in model['network_groups']:
         wf_dn = ng['workflow_dn']
-        if wf_dn and wf_dn not in model['workflows']:
+        if not wf_dn:
+            print(f'[WARN] network-group "{ng["cn"]}" has no workflow configured '
+                  f'(ds-cfg-workflow is empty) — it will show as base-dn:? with no tree.')
+        elif wf_dn not in model['workflows']:
             print(f'[WARN] network-group "{ng["cn"]}" references unknown workflow: {wf_dn}')
     for wf_dn, wf in model['workflows'].items():
         if wf['entry_we_dn'] and wf['entry_we_dn'] not in all_we:

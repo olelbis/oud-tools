@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.5.1] - 2026-07-02
+
+### Fixed
+- **Silent B6 warning (bug in the original B4 implementation)** — a network
+  group with no `ds-cfg-workflow` at all (empty string) produced no warning,
+  because the check `if wf_dn and wf_dn not in model['workflows']`
+  short-circuits on an empty string and never reaches the "not in workflows"
+  branch. Split into two explicit cases: empty `ds-cfg-workflow` now warns
+  directly (`"has no workflow configured"`), and a non-empty but unresolved
+  reference still warns as before (`"references unknown workflow"`).
+
+---
+
 ## [1.5.0] - 2026-07-02
 
 ### Added

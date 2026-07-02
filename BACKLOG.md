@@ -13,8 +13,8 @@ Priority: H=High / M=Medium / L=Low
 | B3 | ~~M~~ | ~~DN comparison is case-sensitive in places — normalise to lower consistently~~ → **done 1.2.0** |
 | B4 | ~~M~~ | ~~Warn if `ds-cfg-workflow-element` points to an unresolved DN~~ → **done 1.2.0** |
 | B5 | ~~M~~ | ~~DN collision if two WEs share the same CN on different branches~~ → **done 1.4.0 (warning added)** |
-| B6 | L | Network group without workflow shows `base-dn:?` — add explicit warning |
-| B7 | M | Detect and warn early if config has no proxy/LB workflow elements (see E1 for broader approach) |
+| B6 | ~~L~~ | ~~Network group without workflow shows `base-dn:?` — add explicit warning~~ → **done 1.5.1** |
+| B7 | ~~M~~ | ~~Detect and warn early if config has no proxy/LB workflow elements~~ → **done 1.5.0 (via E1)** |
 
 ---
 
@@ -22,7 +22,7 @@ Priority: H=High / M=Medium / L=Low
 
 | # | P | Item |
 |---|---|------|
-| E1 | M | `oud_config_type.py` — generic OUD instance classifier (Proxy / Directory Server / Replication Gateway / Global Index Catalog) based on `ds-cfg-java-class` patterns. Feeds B7 and P3. |
+| E1 | ~~M~~ | ~~`oud_config_type.py` — generic OUD instance classifier~~ → **done 1.5.0** (categories implemented: OUD Proxy / OUD Directory Server / Hybrid / Inconclusive; Replication Gateway and standalone Global Index Catalog reported as secondary features, not yet distinct primary categories — no confirmed class-name evidence for those as separate instance types) |
 | E2 | L | Extract shared `oud_ldif_core.py` (parse_ldif, DN utils, first/cn_of) out of `oud_lb_diagram.py` so multiple tools can reuse the same parsing layer |
 | E3 | L | `oud_backend_report.py` — companion tool for plain OUD Directory Server configs (local backends, indexes, replication), mirroring what `oud_lb_diagram.py` does for proxy configs |
 
@@ -89,3 +89,6 @@ Priority: H=High / M=Medium / L=Low
 | D14 | 1.4.0 | Duplicate CN detection/warning (B5) |
 | D15 | 1.4.0 | Tree width counted in box width calc (O1) |
 | D16 | 1.4.0 | Workflow tree rendered as boxed section (O2) |
+| D17 | 1.5.0 | `oud_config_type.py` classifier tool (E1) |
+| D18 | 1.5.0 | Early scope warning wired into oud_lb_diagram.py (B7) |
+| D19 | 1.5.1 | Fixed silent B6 case: empty ds-cfg-workflow now warns explicitly |
