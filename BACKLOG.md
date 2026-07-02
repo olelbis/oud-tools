@@ -53,7 +53,7 @@ Priority: H=High / M=Medium / L=Low
 
 | # | P | Item |
 |---|---|------|
-| C1 | M | Split `extract_model()` into focused functions (one per object type) |
+| C1 | ~~M~~ | ~~Split `extract_model()` into focused functions (one per object type)~~ → **done 1.5.2** |
 | C2 | ~~L~~ | ~~Move Java class name fragments to named constants~~ → **done 1.3.1** |
 | C4 | ~~M~~ | ~~Backend table column widths are magic numbers duplicated between header and data row~~ → **done 1.3.1** |
 | C3 | L | Add basic unit tests for parser and model extraction |
@@ -92,3 +92,4 @@ Priority: H=High / M=Medium / L=Low
 | D17 | 1.5.0 | `oud_config_type.py` classifier tool (E1) |
 | D18 | 1.5.0 | Early scope warning wired into oud_lb_diagram.py (B7) |
 | D19 | 1.5.1 | Fixed silent B6 case: empty ds-cfg-workflow now warns explicitly |
+| D20 | 1.5.2 | Split extract_model() into focused per-object extractors (C1) |

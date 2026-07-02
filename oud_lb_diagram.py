@@ -19,7 +19,7 @@ Usage:
 See CHANGELOG.md for version history.
 """
 
-__version__ = "1.5.1"
+__version__ = "1.5.2"
 
 import sys
 import re
@@ -184,13 +184,9 @@ def algo_type(jc):
 # MODEL EXTRACTION
 # ─────────────────────────────────────────────────────────────────────────────
 
-def extract_model(entries):
-    extensions     = {}
-    proxy_we       = {}
-    lb_we          = {}
-    network_groups = []
-    workflows      = {}
-
+def _extract_extensions(entries):
+    """LDAPServerExtension entries: backend connection details."""
+    extensions = {}
     for dn, e in entries.items():
         if is_extension(e):
             extensions[dn] = {
@@ -204,7 +200,12 @@ def extract_model(entries):
                 'read_timeout':first(e, 'ds-cfg-remote-ldap-server-read-timeout', '-'),
                 'ssl_trust_all':first(e, 'ds-cfg-ssl-trust-all', 'false'),
             }
+    return extensions
 
+
+def _extract_proxy_we(entries):
+    """ProxyLdapWorkflowElement entries: leaf nodes pointing at an extension."""
+    proxy_we = {}
     for dn, e in entries.items():
         if is_proxy_we(e):
             proxy_we[dn] = {
@@ -212,7 +213,12 @@ def extract_model(entries):
                 'extension_dn': first(e, 'ds-cfg-ldap-server-extension').lower(),
                 'cred_mode':    first(e, 'ds-cfg-client-cred-mode', '-'),
             }
+    return proxy_we
 
+
+def _extract_workflows(entries):
+    """Workflow entries (ds-cfg-workflow, excluding *-workflow-element)."""
+    workflows = {}
     for dn, e in entries.items():
         oc = ' '.join(e.get('objectclass', []))
         if 'ds-cfg-workflow' in oc.lower() and 'ds-cfg-workflow-element' not in oc.lower():
@@ -221,7 +227,12 @@ def extract_model(entries):
                 'base_dn':     first(e, 'ds-cfg-base-dn'),
                 'entry_we_dn': first(e, 'ds-cfg-workflow-element').lower(),
             }
+    return workflows
 
+
+def _extract_network_groups(entries):
+    """Network group entries: the client-facing entry point."""
+    network_groups = []
     for dn, e in entries.items():
         oc = ' '.join(e.get('objectclass', []))
         if 'ds-cfg-network-group' in oc.lower():
@@ -232,67 +243,87 @@ def extract_model(entries):
                 'priority':    first(e, 'ds-cfg-priority', '-'),
                 'enabled':     first(e, 'ds-cfg-enabled', 'true'),
             })
+    return network_groups
 
+
+def _extract_route_algorithm(entries, lb_we_dn):
+    """Resolve the cn=algorithm,<lb_we_dn> child entry, if present."""
+    algo_dn = f'cn=algorithm,{lb_we_dn}'  # dn is already lowercase
+    if algo_dn not in entries:
+        return None
+    ae  = entries[algo_dn]
+    ajc = first(ae, 'ds-cfg-java-class')
+    sb  = first(ae, 'ds-cfg-switch-back', 'false').lower() == 'true'
+    return {'type': algo_type(ajc), 'switch_back': sb, 'java_class': ajc}
+
+
+def _extract_routes(entries, lb_we_dn):
+    """Collect and sort all route children under cn=routes,cn=algorithm,<lb_we_dn>."""
+    routes_parent = f'cn=routes,cn=algorithm,{lb_we_dn}'  # already lowercase
+    ops = ('search', 'bind', 'add', 'modify', 'delete', 'compare', 'modifydn', 'extended')
+    routes = []
+
+    for rdn, re_ in entries.items():
+        if ',' not in rdn:
+            continue
+        parent_dn = rdn.split(',', 1)[1]  # already lowercase
+        if parent_dn != routes_parent:
+            continue
+
+        child_we = first(re_, 'ds-cfg-workflow-element').lower()
+
+        priorities = {}
+        for op in ops:
+            v = first(re_, f'ds-cfg-{op}-priority', '')
+            if v.isdigit():
+                priorities[op] = int(v)
+
+        weights = {}
+        for op in ops:
+            w = first(re_, f'ds-cfg-{op}-weight', '')
+            if w.isdigit():
+                weights[op] = int(w)
+
+        # use cn attribute value (preserves original casing); fallback to cn_of(dn)
+        route_cn = first(re_, 'cn') or cn_of(rdn)
+        routes.append({
+            'cn': route_cn, 'dn': rdn,
+            'we_dn': child_we, 'priorities': priorities, 'weights': weights,
+        })
+
+    if routes and any(r['priorities'] for r in routes):
+        routes.sort(key=lambda r: min(r['priorities'].values()) if r['priorities'] else 999)
+
+    return routes
+
+
+def _extract_lb_we(entries):
+    """LoadBalancingWorkflowElement entries, with their algorithm and routes."""
+    lb_we = {}
     for dn, e in entries.items():
         if not is_lb_we(e):
             continue
-        # keys are already lowercase — direct dict lookup, no scan needed
-        algo_dn   = f'cn=algorithm,{dn}'   # dn is already lowercase
-        algorithm = None
-        if algo_dn in entries:
-            ae  = entries[algo_dn]
-            ajc = first(ae, 'ds-cfg-java-class')
-            sb  = first(ae, 'ds-cfg-switch-back', 'false').lower() == 'true'
-            algorithm = {'type': algo_type(ajc), 'switch_back': sb, 'java_class': ajc}
-
-        routes_parent = f'cn=routes,cn=algorithm,{dn}'  # already lowercase
-        routes = []
-        for rdn, re_ in entries.items():
-            if ',' not in rdn:
-                continue
-            parent_dn = rdn.split(',', 1)[1]   # already lowercase
-            if parent_dn != routes_parent:
-                continue
-            child_we = first(re_, 'ds-cfg-workflow-element').lower()
-            ops = ('search','bind','add','modify','delete','compare','modifydn','extended')
-
-            # per-operation priorities (failover)
-            priorities = {}
-            for op in ops:
-                v = first(re_, f'ds-cfg-{op}-priority', '')
-                if v.isdigit():
-                    priorities[op] = int(v)
-
-            # per-operation weights (proportional)
-            weights = {}
-            for op in ops:
-                w = first(re_, f'ds-cfg-{op}-weight', '')
-                if w.isdigit():
-                    weights[op] = int(w)
-
-            # use cn attribute value (preserves original casing); fallback to cn_of(dn)
-            route_cn = first(re_, 'cn') or cn_of(rdn)
-            routes.append({
-                'cn': route_cn, 'dn': rdn,
-                'we_dn': child_we, 'priorities': priorities, 'weights': weights,
-            })
-
-        if routes and any(r["priorities"] for r in routes):
-            routes.sort(key=lambda r: min(r["priorities"].values()) if r["priorities"] else 999)
-
         lb_we[dn] = {
             'cn':        first(e, 'cn'),
             'enabled':   first(e, 'ds-cfg-enabled', 'true'),
-            'algorithm': algorithm,
-            'routes':    routes,
+            'algorithm': _extract_route_algorithm(entries, dn),
+            'routes':    _extract_routes(entries, dn),
         }
+    return lb_we
 
+
+def extract_model(entries):
+    """
+    Build the full object model from parsed LDIF entries. Delegates each
+    object category to its own extractor (C1) so each stays focused and
+    testable in isolation.
+    """
     return {
-        'extensions':     extensions,
-        'proxy_we':       proxy_we,
-        'lb_we':          lb_we,
-        'network_groups': network_groups,
-        'workflows':      workflows,
+        'extensions':     _extract_extensions(entries),
+        'proxy_we':       _extract_proxy_we(entries),
+        'lb_we':          _extract_lb_we(entries),
+        'network_groups': _extract_network_groups(entries),
+        'workflows':      _extract_workflows(entries),
     }
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.5.2] - 2026-07-02
+
+### Changed
+- **Code quality (no behaviour change).** Split the monolithic
+  `extract_model()` into focused, independently readable extractors (C1):
+  `_extract_extensions()`, `_extract_proxy_we()`, `_extract_workflows()`,
+  `_extract_network_groups()`, `_extract_lb_we()` (with helpers
+  `_extract_route_algorithm()` and `_extract_routes()`). `extract_model()`
+  now only orchestrates calls to these and assembles the result dict.
+  Verified byte-for-byte identical output against v1.5.1 on all test configs.
+
+---
+
 ## [1.5.1] - 2026-07-02
 
 ### Fixed
