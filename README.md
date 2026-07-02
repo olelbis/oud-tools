@@ -4,6 +4,21 @@ A command-line utility to parse Oracle Unified Directory (OUD) proxy configurati
 
 ---
 
+## Scope
+
+This tool targets **Oracle Unified Directory Proxy** (formerly Oracle Directory Server Enterprise Edition / Directory Proxy Server — "DPS") configurations specifically, identified by `com.sun.dps.server.workflowelement.*` Java classes (`ProxyLdapWorkflowElement`, `LoadBalancingWorkflowElement`, `LDAPServerExtension`).
+
+It does **not** apply to a plain OUD Directory Server instance (one that stores data locally via a `db-local-backend-workflow-element` / JE backend rather than proxying to remote servers). Running it against such a config will produce an empty or near-empty diagram, since no proxy/LB workflow elements will be found.
+
+| | OUD Directory Server | OUD Proxy |
+|---|---|---|
+| Data backend | Local (JE/DB) | None — routes to remote directories |
+| Typical WE | `db-local-backend-workflow-element` | `proxy-ldap-workflow-element`, `load-balancing-workflow-element` |
+| Java namespace | `org.opends.server.*` only | `org.opends.server.*` (shared base) + `com.sun.dps.server.workflowelement.*` |
+| This tool | Not applicable | ✅ Supported |
+
+---
+
 ## Requirements
 
 - Python 3.6+

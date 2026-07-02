@@ -14,6 +14,17 @@ Priority: H=High / M=Medium / L=Low
 | B4 | ~~M~~ | ~~Warn if `ds-cfg-workflow-element` points to an unresolved DN~~ → **done 1.2.0** |
 | B5 | M | DN collision if two WEs share the same CN on different branches |
 | B6 | L | Network group without workflow shows `base-dn:?` — add explicit warning |
+| B7 | M | Detect and warn early if config has no proxy/LB workflow elements (see E1 for broader approach) |
+
+---
+
+## Ecosystem (longer-term)
+
+| # | P | Item |
+|---|---|------|
+| E1 | M | `oud_config_type.py` — generic OUD instance classifier (Proxy / Directory Server / Replication Gateway / Global Index Catalog) based on `ds-cfg-java-class` patterns. Feeds B7 and P3. |
+| E2 | L | Extract shared `oud_ldif_core.py` (parse_ldif, DN utils, first/cn_of) out of `oud_lb_diagram.py` so multiple tools can reuse the same parsing layer |
+| E3 | L | `oud_backend_report.py` — companion tool for plain OUD Directory Server configs (local backends, indexes, replication), mirroring what `oud_lb_diagram.py` does for proxy configs |
 
 ---
 
