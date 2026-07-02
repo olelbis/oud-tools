@@ -67,76 +67,71 @@ The script reads the OUD proxy `config.ldif` file and:
 [+] Parsed 316 LDIF entries from: config_proxyoud_test.ldif
 [+] Found: 2 network group(s)  1 workflow(s)  6 LB WE(s)  6 proxy WE(s)  6 backend extension(s)
 
-╔═════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-║                                 OUD PROXY — LOAD BALANCING ARCHITECTURE                                 ║
-╚═════════════════════════════════════════════════════════════════════════════════════════════════════════╝
+╔════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+║                                  OUD PROXY — LOAD BALANCING ARCHITECTURE                                   ║
+╚════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
 
-┌─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│  NETWORK GROUPS                                                                                         │
-├─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│  cn=network-group  priority:1  enabled:true  →  workflow:workflowLB  base-dn:dc=example,dc=com          │
-└─────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│  NETWORK GROUPS                                                                                            │
+├────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│  cn=network-group  priority:1  enabled:true  →  workflow:workflowLB  base-dn:dc=example,dc=com             │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│  WORKFLOW TREE  —  workflowLB  —  base-dn: dc=example,dc=com                                            │
-├─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-└─────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│  WORKFLOW TREE  —  workflowLB  —  base-dn: dc=example,dc=com                                               │
+├────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│  └─ LB_MS  [PROPORTIONAL]                                                                                  │
+│     ├─ LB_MS_routeR  weights: search/bind/compare/extended:1  add/modify/delete/modifydn:0                 │
+│     │  └─ LB-Slave  [PROPORTIONAL]                                                                         │
+│     │     ├─ LB-Slave_S1  weights: search/bind/add/modify/delete/compare/modifydn/extended:1               │
+│     │     │  └─ FO_S1  [FAILOVER  switch-back:ON]                                                          │
+│     │     │     ├─ FO_S1_routeS3  prio: all:1                                                              │
+│     │     │     │  └─ proxy-we5  →  198.51.100.21  port:389  SSL:1636  (always)  cred:use-client-identity  │
+│     │     │     ├─ FO_S1_routeS4  prio: all:2                                                              │
+│     │     │     │  └─ proxy-we6  →  198.51.100.22  port:389  SSL:1636  (always)  cred:use-client-identity  │
+│     │     │     ├─ FO_S1_routeS1  prio: all:3                                                              │
+│     │     │     │  └─ proxy-we3  →  198.51.100.11  port:389  SSL:1636  (always)  cred:use-client-identity  │
+│     │     │     └─ FO_S1_routeS2  prio: all:4                                                              │
+│     │     │        └─ proxy-we4  →  198.51.100.12  port:389  SSL:1636  (always)  cred:use-client-identity  │
+│     │     └─ LB-Slave_S2  weights: search/bind/add/modify/delete/compare/modifydn/extended:1               │
+│     │        └─ FO_S2  [FAILOVER  switch-back:ON]                                                          │
+│     │           ├─ FO_S2_routeS4  prio: all:1                                                              │
+│     │           │  └─ proxy-we6  →  198.51.100.22  port:389  SSL:1636  (always)  cred:use-client-identity  │
+│     │           └─ ...                                                                                     │
+│     └─ LB_MS_routeW  weights: add/modify/delete/modifydn:1  search/bind/compare/extended:0                 │
+│        └─ LB-Master  [PROPORTIONAL]                                                                        │
+│           └─ LB-Master_M  weights: search/bind/add/modify/delete/compare/modifydn/extended:1               │
+│              └─ FO_M  [FAILOVER  switch-back:ON]                                                           │
+│                 ├─ FO_M_routeM2  prio: all:1                                                               │
+│                 │  └─ proxy-we2  →  198.51.100.20  port:389  SSL:1636  (always)  cred:use-client-identity  │
+│                 └─ FO_M_routeM1  prio: all:2                                                               │
+│                    └─ proxy-we1  →  198.51.100.10  port:389  SSL:1636  (always)  cred:use-client-identity  │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
-  └─ LB_MS  [PROPORTIONAL]
-     ├─ LB_MS_routeR  weights: search/bind/compare/extended:1  add/modify/delete/modifydn:0
-     │  └─ LB-Slave  [PROPORTIONAL]
-     │     ├─ LB-Slave_S1  weights: search/bind/add/modify/delete/compare/modifydn/extended:1
-     │     │  └─ FO_S1  [FAILOVER  switch-back:ON]
-     │     │     ├─ FO_S1_routeS3  prio: all:1
-     │     │     │  └─ proxy-we5  →  198.51.100.21  port:389  SSL:1636  (always)  cred:use-client-identity
-     │     │     ├─ FO_S1_routeS4  prio: all:2
-     │     │     │  └─ proxy-we6  →  198.51.100.22  port:389  SSL:1636  (always)  cred:use-client-identity
-     │     │     ├─ FO_S1_routeS1  prio: all:3
-     │     │     │  └─ proxy-we3  →  198.51.100.11  port:389  SSL:1636  (always)  cred:use-client-identity
-     │     │     └─ FO_S1_routeS2  prio: all:4
-     │     │        └─ proxy-we4  →  198.51.100.12  port:389  SSL:1636  (always)  cred:use-client-identity
-     │     └─ LB-Slave_S2  weights: search/bind/add/modify/delete/compare/modifydn/extended:1
-     │        └─ FO_S2  [FAILOVER  switch-back:ON]
-     │           ├─ FO_S2_routeS4  prio: all:1
-     │           │  └─ proxy-we6  →  198.51.100.22  port:389  SSL:1636  (always)  cred:use-client-identity
-     │           ├─ FO_S2_routeS3  prio: all:2
-     │           │  └─ proxy-we5  →  198.51.100.21  port:389  SSL:1636  (always)  cred:use-client-identity
-     │           ├─ FO_S2_routeS2  prio: all:3
-     │           │  └─ proxy-we4  →  198.51.100.12  port:389  SSL:1636  (always)  cred:use-client-identity
-     │           └─ FO_S2_routeS1  prio: all:4
-     │              └─ proxy-we3  →  198.51.100.11  port:389  SSL:1636  (always)  cred:use-client-identity
-     └─ LB_MS_routeW  weights: add/modify/delete/modifydn:1  search/bind/compare/extended:0
-        └─ LB-Master  [PROPORTIONAL]
-           └─ LB-Master_M  weights: search/bind/add/modify/delete/compare/modifydn/extended:1
-              └─ FO_M  [FAILOVER  switch-back:ON]
-                 ├─ FO_M_routeM2  prio: all:1
-                 │  └─ proxy-we2  →  198.51.100.20  port:389  SSL:1636  (always)  cred:use-client-identity
-                 └─ FO_M_routeM1  prio: all:2
-                    └─ proxy-we1  →  198.51.100.10  port:389  SSL:1636  (always)  cred:use-client-identity
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│  BACKEND SERVERS                                                                                           │
+├────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│  Extension   WE              IP Address          Port    SSL     Policy    Pool     Cred-mode              │
+│  --------------------------------------------------------------------------------------------------------  │
+│  proxy1      proxy-we1       198.51.100.10       389     1636    always    10000    use-client-identity    │
+│  proxy2      proxy-we2       198.51.100.20       389     1636    always    10000    use-client-identity    │
+│  proxy3      proxy-we3       198.51.100.11       389     1636    always    10000    use-client-identity    │
+│  proxy4      proxy-we4       198.51.100.12       389     1636    always    10000    use-client-identity    │
+│  proxy5      proxy-we5       198.51.100.21       389     1636    always    10000    use-client-identity    │
+│  proxy6      proxy-we6       198.51.100.22       389     1636    always    10000    use-client-identity    │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│  BACKEND SERVERS                                                                                        │
-├─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│  Extension   WE              IP Address          Port    SSL     Policy    Pool     Cred-mode           │
-│  proxy1      proxy-we1       198.51.100.10       389     1636    always    10000    use-client-identity │
-│  proxy2      proxy-we2       198.51.100.20       389     1636    always    10000    use-client-identity │
-│  proxy3      proxy-we3       198.51.100.11       389     1636    always    10000    use-client-identity │
-│  proxy4      proxy-we4       198.51.100.12       389     1636    always    10000    use-client-identity │
-│  proxy5      proxy-we5       198.51.100.21       389     1636    always    10000    use-client-identity │
-│  proxy6      proxy-we6       198.51.100.22       389     1636    always    10000    use-client-identity │
-└─────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│  LEGEND                                                                                                 │
-├─────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│  PROPORTIONAL   Distributes traffic by weight per operation type.                                       │
-│                 weights shown as  ops:value  —  e.g. add/modify/delete:1  search/bind:0                 │
-│  FAILOVER       One active node at a time; lower [prio] = preferred.                                    │
-│                 switch-back:ON = auto-restore to primary when it recovers.                              │
-│  ROUND-ROBIN    Cycles through available routes in order.                                               │
-│  └─ <node>      Leaf node = backend proxy WE resolved to IP:port.                                       │
-│  cred-mode      How client credentials are forwarded to the backend.                                    │
-└─────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│  LEGEND                                                                                                    │
+├────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│  PROPORTIONAL   Distributes traffic by weight per operation type.                                          │
+│                 weights shown as  ops:value  —  e.g. add/modify/delete:1  search/bind:0                    │
+│  FAILOVER       One active node at a time; lower [prio] = preferred.                                       │
+│                 switch-back:ON = auto-restore to primary when it recovers.                                 │
+│  ROUND-ROBIN    Cycles through available routes in order.                                                  │
+│  └─ <node>      Leaf node = backend proxy WE resolved to IP:port.                                          │
+│  cred-mode      How client credentials are forwarded to the backend.                                       │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 > Note: the diagram frame width above adapts automatically to the longest line in the loaded config (bounded between `MIN_W=60` and `MAX_W=200` columns) — your output may be narrower or wider depending on attribute lengths, DN depth, and IP formats.

@@ -19,10 +19,11 @@ Usage:
 See CHANGELOG.md for version history.
 """
 
-__version__ = "1.3.1"
+__version__ = "1.4.0"
 
 import sys
 import re
+import io
 import base64
 from collections import defaultdict
 
@@ -430,8 +431,13 @@ def build_network_groups_section(model):
     return sec
 
 
-def build_workflow_header_sections(model):
-    """One small header box per workflow tree (title only, body printed unframed)."""
+def build_workflow_tree_sections(model):
+    """
+    One boxed section per workflow tree: title + the full rendered tree body
+    captured into the section (instead of printed unframed). This makes the
+    tree's own width count toward the overall box width (fixes O1) and
+    gives it the same frame as every other section (fixes O2).
+    """
     sections = []
     ngs = model['network_groups']
     wfs = model['workflows']
@@ -445,7 +451,17 @@ def build_workflow_header_sections(model):
         base_dn = wf_info.get('base_dn', '?')
         wf_cn = wf_info.get('cn') or cn_of(wf_dn)
         sec = Section(f'WORKFLOW TREE  —  {wf_cn}  —  base-dn: {base_dn}')
-        sections.append((wf_dn, wf_info, sec))
+
+        entry_we = wf_info.get('entry_we_dn', '')
+        if not entry_we:
+            sec.add('[!] No entry workflow element found.')
+        else:
+            buf = io.StringIO()
+            render_tree(entry_we, model, prefix='', is_last=True, file=buf)
+            for line in buf.getvalue().splitlines():
+                sec.add(line)
+
+        sections.append(sec)
     return sections
 
 
@@ -519,14 +535,16 @@ def print_header(w, file=None):
 
 def print_diagram(model, file=None, no_tree=False):
     ngs_sec = build_network_groups_section(model)
-    wf_sections = build_workflow_header_sections(model)
+    wf_sections = build_workflow_tree_sections(model)  # now full boxed sections (O1+O2)
     backend_sec = build_backend_servers_section(model)
     legend_sec = build_legend_section()
 
     # Width is computed once from every boxed section, so all frames line up.
+    # Tree sections now carry their own rendered content, so their indentation
+    # and node labels count toward the width just like any other section.
     candidates = [ngs_sec.content_width(), backend_sec.content_width(), legend_sec.content_width()]
     if not no_tree:
-        candidates += [sec.content_width() for _, _, sec in wf_sections]
+        candidates += [sec.content_width() for sec in wf_sections]
     title_width = len(' OUD PROXY — LOAD BALANCING ARCHITECTURE ') + 2
     candidates.append(title_width)
     # content_width() = len("  " + longest_line), i.e. left margin (2) + text.
@@ -544,15 +562,8 @@ def print_diagram(model, file=None, no_tree=False):
         print('  [--no-tree] Workflow tree(s) skipped.', file=file)
         print(file=file)
     else:
-        for wf_dn, wf_info, sec in wf_sections:
+        for sec in wf_sections:
             print_section(sec, w, file=file)
-            print(file=file)
-            entry_we = wf_info.get('entry_we_dn', '')
-            if not entry_we:
-                print('  [!] No entry workflow element found.', file=file)
-                print(file=file)
-                continue
-            render_tree(entry_we, model, prefix='  ', is_last=True, file=file)
             print(file=file)
 
     print_section(backend_sec, w, file=file)
@@ -602,6 +613,35 @@ def parse_args(argv):
     return args
 
 
+def find_duplicate_cn_warnings(model):
+    """
+    B5 — internal lookups always use the full DN as key, so routing/rendering
+    stays correct even if two entries share the same cn under different
+    parents. But identical labels in the diagram can still mislead a human
+    reader (e.g. two distinct proxy-we entries both showing as "proxy-we5").
+    This scans each object category and warns about such display collisions.
+    """
+    warnings = []
+    categories = {
+        'proxy WE':  model['proxy_we'],
+        'LB WE':     model['lb_we'],
+        'extension': model['extensions'],
+    }
+    for label, objects in categories.items():
+        by_cn = defaultdict(list)
+        for dn, obj in objects.items():
+            by_cn[obj['cn']].append(dn)
+        for cn, dns in by_cn.items():
+            if len(dns) > 1:
+                warnings.append(
+                    f'duplicate {label} cn "{cn}" used by {len(dns)} distinct entries '
+                    f'(routing is still correct — each is resolved by its full DN, '
+                    f'but the diagram will show "{cn}" more than once): '
+                    + ' | '.join(dns)
+                )
+    return warnings
+
+
 def main():
     args = parse_args(sys.argv[1:])
 
@@ -640,6 +680,10 @@ def main():
     for pwe_dn, pwe in model['proxy_we'].items():
         if pwe['extension_dn'] and pwe['extension_dn'] not in model['extensions']:
             print(f'[WARN] proxy-we "{pwe["cn"]}" references unknown extension: {pwe["extension_dn"]}')
+
+    # B5 — warn on duplicate display CNs (routing correctness unaffected)
+    for w in find_duplicate_cn_warnings(model):
+        print(f'[WARN] {w}')
 
     print(f'[+] Found: {len(model["network_groups"])} network group(s)  '
           f'{len(model["workflows"])} workflow(s)  '

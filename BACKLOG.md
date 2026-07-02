@@ -12,7 +12,7 @@ Priority: H=High / M=Medium / L=Low
 | B2 | ~~H~~ | ~~base64 values (`attr:: dmFsdWU=`) silently ignored~~ → **done 1.2.0** |
 | B3 | ~~M~~ | ~~DN comparison is case-sensitive in places — normalise to lower consistently~~ → **done 1.2.0** |
 | B4 | ~~M~~ | ~~Warn if `ds-cfg-workflow-element` points to an unresolved DN~~ → **done 1.2.0** |
-| B5 | M | DN collision if two WEs share the same CN on different branches |
+| B5 | ~~M~~ | ~~DN collision if two WEs share the same CN on different branches~~ → **done 1.4.0 (warning added)** |
 | B6 | L | Network group without workflow shows `base-dn:?` — add explicit warning |
 | B7 | M | Detect and warn early if config has no proxy/LB workflow elements (see E1 for broader approach) |
 
@@ -32,8 +32,8 @@ Priority: H=High / M=Medium / L=Low
 
 | # | P | Item |
 |---|---|------|
-| O1 | M | Deep tree branches can exceed `MAX_W` — account for indentation in width calc |
-| O2 | M | Workflow tree body unframed — consider consistent boxing with other sections |
+| O1 | ~~M~~ | ~~Deep tree branches can exceed `MAX_W` — account for indentation in width calc~~ → **done 1.4.0** |
+| O2 | ~~M~~ | ~~Workflow tree body unframed — consider consistent boxing with other sections~~ → **done 1.4.0** |
 | O3 | L | Highlight disabled WEs (`ds-cfg-enabled: false`) more visibly (e.g. `[DISABLED]` in red or `!!`) |
 
 ---
@@ -86,3 +86,6 @@ Priority: H=High / M=Medium / L=Low
 | D11 | 1.3.0 | `--no-tree` flag (F2) |
 | D12 | 1.3.1 | Java class fragments extracted to named constants (C2) |
 | D13 | 1.3.1 | Backend table column widths extracted to named constants (C4) |
+| D14 | 1.4.0 | Duplicate CN detection/warning (B5) |
+| D15 | 1.4.0 | Tree width counted in box width calc (O1) |
+| D16 | 1.4.0 | Workflow tree rendered as boxed section (O2) |

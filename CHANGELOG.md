@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.4.0] - 2026-07-02
+
+### Added
+- **Duplicate CN detection (B5)** — warns when two distinct entries (proxy WE,
+  LB WE, or extension) share the same `cn` under different parents. Routing
+  and rendering were always correct (full DN used as the lookup key), but
+  identical labels in the diagram could mislead a human reader; this makes
+  the ambiguity explicit via `[WARN] duplicate ... cn "..." used by N distinct
+  entries ...` with both DNs listed.
+
+### Changed
+- **Workflow tree is now a boxed section (O2)** — previously printed
+  unframed below its header box; the full tree body is now captured and
+  rendered inside the same frame style as every other section
+  (network groups, backend servers, legend).
+- **Tree width now counts toward the box width (O1)** — as a consequence of
+  the above, deeply indented branches are no longer silently excluded from
+  the width calculation; the frame now sizes itself to fit the tree content
+  too (still bounded by `MIN_W`/`MAX_W`).
+
+---
+
 ## [1.3.1] - 2026-07-02
 
 ### Changed
