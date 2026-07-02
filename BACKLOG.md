@@ -48,6 +48,16 @@ Priority: H=High / M=Medium / L=Low
 
 ---
 
+## Project / Repo
+
+| # | P | Item |
+|---|---|------|
+| P1 | M | Update README to reflect v1.2.0 (parser fixes, warnings) |
+| P2 | L | Create GitHub release with changelog notes (v1.2.0) |
+| P3 | L | Evaluate second tool in repo (e.g. OUD config validator/linter) |
+
+---
+
 ## Done
 
 | # | Version | Item |
