@@ -20,9 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 - **Backend servers table separator** — the dashed line under the column
   header now stretches to the full dynamic box width instead of a fixed
-  length tied to the header text, which previously left a ragged gap when
-  `--no-tree` produced a narrower frame than the header separator itself.
-  Implemented via a `Section.add_separator()` sentinel rendered at print time.
+  length tied to the header text. Implemented via a `Section.add_separator()`
+  sentinel rendered at print time.
+- **Asymmetric box padding** — the box width calculation previously left a
+  2-space margin on the left but only 1 space on the right for the widest
+  line in a section (e.g. the `use-client-identity` column in the backend
+  table), making right borders look ragged/overflowing. Width is now
+  computed to guarantee a symmetric 2-space margin on both sides.
 
 ### Changed
 - `print_diagram()`, `print_section()`, `print_header()` and `render_tree()`

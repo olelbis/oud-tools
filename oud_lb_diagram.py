@@ -496,9 +496,10 @@ def print_diagram(model, file=None, no_tree=False):
         candidates += [sec.content_width() for _, _, sec in wf_sections]
     title_width = len(' OUD PROXY — LOAD BALANCING ARCHITECTURE ') + 2
     candidates.append(title_width)
-    # content_width() = len(longest "  line") . We need w-2 to be strictly
-    # greater than that, so the right border always has at least 1 space gap.
-    w = (max(candidates) if candidates else MIN_W) + 3
+    # content_width() = len("  " + longest_line), i.e. left margin (2) + text.
+    # w-2 must equal that plus a matching 2-space right margin, so both
+    # borders have identical padding on the longest line in the box.
+    w = (max(candidates) if candidates else MIN_W) + 4
     w = max(MIN_W, min(MAX_W, w))
 
     print_header(w, file=file)
