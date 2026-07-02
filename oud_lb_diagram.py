@@ -380,6 +380,8 @@ def render_tree(we_dn, model, prefix='', is_last=True, file=None):
 
 class Section:
     """A titled box whose body lines are collected before being framed."""
+    SEP = object()  # sentinel: render as a full-width separator at print time
+
     def __init__(self, title):
         self.title = title
         self.lines = []
@@ -387,9 +389,12 @@ class Section:
     def add(self, text=''):
         self.lines.append(text)
 
+    def add_separator(self):
+        self.lines.append(Section.SEP)
+
     def content_width(self):
         widths = [len(self.title) + 2]  # "  TITLE"
-        widths += [len(l) + 2 for l in self.lines]  # "  line"
+        widths += [len(l) + 2 for l in self.lines if l is not Section.SEP]
         return max(widths) if widths else 0
 
 
@@ -432,7 +437,7 @@ def build_backend_servers_section(model):
     exts = model['extensions']
     hdr = f'{"Extension":<10}  {"WE":<14}  {"IP Address":<18}  {"Port":<6}  {"SSL":<6}  {"Policy":<8}  {"Pool":<7}  Cred-mode'
     sec.add(hdr)
-    sec.add('-' * len(hdr))
+    sec.add_separator()
     for pwe_dn in sorted(pwe.keys(), key=lambda d: pwe[d]['cn']):
         p   = pwe[pwe_dn]
         ext = exts.get(p['extension_dn'], {})
@@ -463,7 +468,10 @@ def print_section(sec, w, file=None):
     print('│' + ('  ' + sec.title).ljust(w - 2) + '│', file=file)
     print('├' + '─' * (w - 2) + '┤', file=file)
     for l in sec.lines:
-        print('│' + ('  ' + l).ljust(w - 2) + '│', file=file)
+        if l is Section.SEP:
+            print('│' + ('  ' + '-' * (w - 6)).ljust(w - 2) + '│', file=file)
+        else:
+            print('│' + ('  ' + l).ljust(w - 2) + '│', file=file)
     print('└' + '─' * (w - 2) + '┘', file=file)
 
 

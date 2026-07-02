@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Both flags can be combined: `--output report.txt --no-tree`.
 - Minimal hand-rolled argument parser (`parse_args()`), no external dependencies.
 
+### Fixed
+- **Backend servers table separator** — the dashed line under the column
+  header now stretches to the full dynamic box width instead of a fixed
+  length tied to the header text, which previously left a ragged gap when
+  `--no-tree` produced a narrower frame than the header separator itself.
+  Implemented via a `Section.add_separator()` sentinel rendered at print time.
+
 ### Changed
 - `print_diagram()`, `print_section()`, `print_header()` and `render_tree()`
   now accept an optional `file=` parameter for output redirection.
@@ -25,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-
+## [1.2.0] - 2026-07-02
 
 ### Fixed
 - **RFC 4511 line folding** — continuation lines (starting with a single space)
