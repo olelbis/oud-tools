@@ -11,13 +11,15 @@ Semantic interpretation (e.g. WRITE vs READ) is left to the reader.
 
 Usage:
     python oud_lb_diagram.py <path-to-config.ldif>
-    python oud_lb_diagram.py                        # looks for 'config.ldif' in cwd
-    python oud_lb_diagram.py --version               # print version and exit
+    python oud_lb_diagram.py                          # looks for 'config.ldif' in cwd
+    python oud_lb_diagram.py --version                 # print version and exit
+    python oud_lb_diagram.py <config> --output <file>   # save diagram to file instead of stdout
+    python oud_lb_diagram.py <config> --no-tree          # print only network groups + backend table
 
 See CHANGELOG.md for version history.
 """
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 import sys
 import re
@@ -319,7 +321,7 @@ def fmt_algo(algo):
 # RECURSIVE TREE RENDERER
 # ─────────────────────────────────────────────────────────────────────────────
 
-def render_tree(we_dn, model, prefix='', is_last=True):
+def render_tree(we_dn, model, prefix='', is_last=True, file=None):
     lb_we      = model['lb_we']
     proxy_we   = model['proxy_we']
     extensions = model['extensions']
@@ -338,14 +340,14 @@ def render_tree(we_dn, model, prefix='', is_last=True):
         cred = p.get('cred_mode', '?')
         print(f'{prefix}{connector}{p["cn"]}'
               f'  →  {addr}  port:{port}  SSL:{ssl}  ({pol})'
-              f'  cred:{cred}')
+              f'  cred:{cred}', file=file)
         return
 
     # ── LB WE ────────────────────────────────────────────────────────────────
     if we_dn in lb_we:
         info = lb_we[we_dn]
         enab = '' if info['enabled'] == 'true' else '  [DISABLED]'
-        print(f'{prefix}{connector}{info["cn"]}  {fmt_algo(info["algorithm"])}{enab}')
+        print(f'{prefix}{connector}{info["cn"]}  {fmt_algo(info["algorithm"])}{enab}', file=file)
 
         routes = info['routes']
         for i, route in enumerate(routes):
@@ -359,13 +361,13 @@ def render_tree(we_dn, model, prefix='', is_last=True):
             w_s = ''
             if route['weights']:
                 w_s = f'  weights: {fmt_weights(route["weights"])}'
-            print(f'{child_pfx}{r_con}{route["cn"]}{prio_s}{w_s}')
+            print(f'{child_pfx}{r_con}{route["cn"]}{prio_s}{w_s}', file=file)
 
-            render_tree(route['we_dn'], model, prefix=r_pfx, is_last=True)
+            render_tree(route['we_dn'], model, prefix=r_pfx, is_last=True, file=file)
         return
 
     # ── UNKNOWN ──────────────────────────────────────────────────────────────
-    print(f'{prefix}{connector}[?] {cn_of(we_dn)}  (not resolved)')
+    print(f'{prefix}{connector}[?] {cn_of(we_dn)}  (not resolved)', file=file)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DIAGRAM
@@ -456,25 +458,25 @@ def build_legend_section():
     return sec
 
 
-def print_section(sec, w):
-    print('┌' + '─' * (w - 2) + '┐')
-    print('│' + ('  ' + sec.title).ljust(w - 2) + '│')
-    print('├' + '─' * (w - 2) + '┤')
+def print_section(sec, w, file=None):
+    print('┌' + '─' * (w - 2) + '┐', file=file)
+    print('│' + ('  ' + sec.title).ljust(w - 2) + '│', file=file)
+    print('├' + '─' * (w - 2) + '┤', file=file)
     for l in sec.lines:
-        print('│' + ('  ' + l).ljust(w - 2) + '│')
-    print('└' + '─' * (w - 2) + '┘')
+        print('│' + ('  ' + l).ljust(w - 2) + '│', file=file)
+    print('└' + '─' * (w - 2) + '┘', file=file)
 
 
-def print_header(w):
+def print_header(w, file=None):
     title = ' OUD PROXY — LOAD BALANCING ARCHITECTURE '
-    print()
-    print('╔' + '═' * (w - 2) + '╗')
-    print('║' + title.center(w - 2) + '║')
-    print('╚' + '═' * (w - 2) + '╝')
-    print()
+    print(file=file)
+    print('╔' + '═' * (w - 2) + '╗', file=file)
+    print('║' + title.center(w - 2) + '║', file=file)
+    print('╚' + '═' * (w - 2) + '╝', file=file)
+    print(file=file)
 
 
-def print_diagram(model):
+def print_diagram(model, file=None, no_tree=False):
     ngs_sec = build_network_groups_section(model)
     wf_sections = build_workflow_header_sections(model)
     backend_sec = build_backend_servers_section(model)
@@ -482,7 +484,8 @@ def print_diagram(model):
 
     # Width is computed once from every boxed section, so all frames line up.
     candidates = [ngs_sec.content_width(), backend_sec.content_width(), legend_sec.content_width()]
-    candidates += [sec.content_width() for _, _, sec in wf_sections]
+    if not no_tree:
+        candidates += [sec.content_width() for _, _, sec in wf_sections]
     title_width = len(' OUD PROXY — LOAD BALANCING ARCHITECTURE ') + 2
     candidates.append(title_width)
     # content_width() = len(longest "  line") . We need w-2 to be strictly
@@ -490,45 +493,89 @@ def print_diagram(model):
     w = (max(candidates) if candidates else MIN_W) + 3
     w = max(MIN_W, min(MAX_W, w))
 
-    print_header(w)
+    print_header(w, file=file)
 
-    print_section(ngs_sec, w)
-    print()
+    print_section(ngs_sec, w, file=file)
+    print(file=file)
 
-    for wf_dn, wf_info, sec in wf_sections:
-        print_section(sec, w)
-        print()
-        entry_we = wf_info.get('entry_we_dn', '')
-        if not entry_we:
-            print('  [!] No entry workflow element found.')
-            print()
-            continue
-        render_tree(entry_we, model, prefix='  ', is_last=True)
-        print()
+    if no_tree:
+        print('  [--no-tree] Workflow tree(s) skipped.', file=file)
+        print(file=file)
+    else:
+        for wf_dn, wf_info, sec in wf_sections:
+            print_section(sec, w, file=file)
+            print(file=file)
+            entry_we = wf_info.get('entry_we_dn', '')
+            if not entry_we:
+                print('  [!] No entry workflow element found.', file=file)
+                print(file=file)
+                continue
+            render_tree(entry_we, model, prefix='  ', is_last=True, file=file)
+            print(file=file)
 
-    print_section(backend_sec, w)
-    print()
+    print_section(backend_sec, w, file=file)
+    print(file=file)
 
-    print_section(legend_sec, w)
-    print()
+    print_section(legend_sec, w, file=file)
+    print(file=file)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────────────────────────────────────
 
+def parse_args(argv):
+    """
+    Minimal hand-rolled arg parser (no external deps).
+    Supports:
+      <path>                positional config file (optional, default 'config.ldif')
+      --version / -v        print version and exit
+      --output <file>       write diagram to file instead of stdout
+      --no-tree             skip workflow tree section(s)
+    """
+    args = {'path': None, 'output': None, 'no_tree': False, 'version': False}
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a in ('--version', '-v'):
+            args['version'] = True
+        elif a == '--output':
+            i += 1
+            if i >= len(argv):
+                print('[ERROR] --output requires a file path')
+                sys.exit(1)
+            args['output'] = argv[i]
+        elif a == '--no-tree':
+            args['no_tree'] = True
+        elif a.startswith('--'):
+            print(f'[ERROR] Unknown option: {a}')
+            sys.exit(1)
+        elif args['path'] is None:
+            args['path'] = a
+        else:
+            print(f'[ERROR] Unexpected argument: {a}')
+            sys.exit(1)
+        i += 1
+    if args['path'] is None:
+        args['path'] = 'config.ldif'
+    return args
+
+
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] in ('--version', '-v'):
+    args = parse_args(sys.argv[1:])
+
+    if args['version']:
         print(f'oud_lb_diagram.py v{__version__}')
         sys.exit(0)
 
-    path = sys.argv[1] if len(sys.argv) > 1 else 'config.ldif'
+    path = args['path']
     try:
         entries, parse_warnings = parse_ldif(path)
     except FileNotFoundError:
         print(f'[ERROR] File not found: {path}')
-        print('Usage: python oud_lb_diagram.py <path-to-config.ldif>')
+        print('Usage: python oud_lb_diagram.py <path-to-config.ldif> [--output <file>] [--no-tree]')
         sys.exit(1)
 
+    # Header / warnings always go to stdout, even when the diagram is saved to file
     print(f'\n[+] Parsed {len(entries)} LDIF entries from: {path}')
     for w in parse_warnings:
         print(f'[WARN] {w}')
@@ -557,7 +604,17 @@ def main():
           f'{len(model["lb_we"])} LB WE(s)  '
           f'{len(model["proxy_we"])} proxy WE(s)  '
           f'{len(model["extensions"])} backend extension(s)')
-    print_diagram(model)
+
+    if args['output']:
+        try:
+            with open(args['output'], 'w', encoding='utf-8') as out:
+                print_diagram(model, file=out, no_tree=args['no_tree'])
+            print(f'[+] Diagram written to: {args["output"]}')
+        except OSError as ex:
+            print(f'[ERROR] Could not write to {args["output"]}: {ex}')
+            sys.exit(1)
+    else:
+        print_diagram(model, no_tree=args['no_tree'])
 
 if __name__ == '__main__':
     main()

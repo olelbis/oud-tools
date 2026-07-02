@@ -30,7 +30,10 @@ It does **not** apply to a plain OUD Directory Server instance (one that stores 
 
 ```bash
 python oud_lb_diagram.py <path-to-config.ldif>
-python oud_lb_diagram.py --version       # print version and exit
+python oud_lb_diagram.py --version                             # print version and exit
+python oud_lb_diagram.py <config> --output <file>               # save diagram to file
+python oud_lb_diagram.py <config> --no-tree                     # skip workflow tree(s), print only summary + backend table
+python oud_lb_diagram.py <config> --output report.txt --no-tree  # combine both
 ```
 
 If no argument is provided, the script looks for `config.ldif` in the current directory.

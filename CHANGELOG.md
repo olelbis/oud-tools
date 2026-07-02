@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.2.0] - 2026-07-02
+## [1.3.0] - 2026-07-02
+
+### Added
+- `--output <file>` flag — writes the diagram to a file instead of stdout.
+  Parse summary and warnings still print to stdout even when `--output` is used.
+- `--no-tree` flag — skips the workflow tree section(s), printing only network
+  groups, backend servers table, and legend. Useful for a quick backend inventory.
+- Both flags can be combined: `--output report.txt --no-tree`.
+- Minimal hand-rolled argument parser (`parse_args()`), no external dependencies.
+
+### Changed
+- `print_diagram()`, `print_section()`, `print_header()` and `render_tree()`
+  now accept an optional `file=` parameter for output redirection.
+- Unknown CLI flags now produce a clear `[ERROR] Unknown option: ...` and exit
+  with status 1, instead of being silently ignored or misread as a config path.
+
+---
+
+
 
 ### Fixed
 - **RFC 4511 line folding** — continuation lines (starting with a single space)

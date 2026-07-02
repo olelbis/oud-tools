@@ -42,8 +42,8 @@ Priority: H=High / M=Medium / L=Low
 
 | # | P | Item |
 |---|---|------|
-| F1 | M | `--output <file>` flag to save diagram to disk |
-| F2 | M | `--no-tree` flag to print only backend table (quick summary mode) |
+| F1 | ~~M~~ | ~~`--output <file>` flag to save diagram to disk~~ → **done 1.3.0** |
+| F2 | ~~M~~ | ~~`--no-tree` flag to print only backend table (quick summary mode)~~ → **done 1.3.0** |
 | F3 | L | `--anonymize` flag to mask IPs in output |
 | F4 | L | JSON/YAML output mode for machine-readable consumption |
 
@@ -81,3 +81,5 @@ Priority: H=High / M=Medium / L=Low
 | D9 | 1.2.0 | Warn on unresolved DN references (B4) |
 | P1 | 1.2.0 | README updated with v1.2.0 parser fixes |
 | P2 | 1.2.0 | Release notes drafted for v1.2.0 |
+| D10 | 1.3.0 | `--output <file>` flag (F1) |
+| D11 | 1.3.0 | `--no-tree` flag (F2) |
