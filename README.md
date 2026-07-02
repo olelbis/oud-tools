@@ -204,6 +204,20 @@ python oud_lb_diagram.py --version
 
 | File | Description |
 |---|---|
-| `oud_lb_diagram.py` | Main script |
+| `oud_lb_diagram.py` | Main script — load balancing diagram |
+| `oud_config_type.py` | OUD instance classifier (Proxy / Directory Server / Hybrid). Run standalone or used automatically by `oud_lb_diagram.py` for an early scope warning. |
 | `README.md` | This file |
 | `CHANGELOG.md` | Version history |
+| `BACKLOG.md` | Planned work |
+
+---
+
+## Companion tool: `oud_config_type.py`
+
+Detects what kind of OUD instance a config belongs to, based on `ds-cfg-java-class` and objectClass evidence — useful to check *before* running the diagram tool, since `oud_lb_diagram.py` only supports OUD Proxy configs.
+
+```bash
+python oud_config_type.py <path-to-config.ldif>
+```
+
+Reports one of: `OUD Proxy`, `OUD Directory Server`, `Hybrid` (both proxy-LB and a real local data backend present — unusual), or `Unknown / inconclusive`, plus the matching DNs as evidence. If placed in the same directory as `oud_lb_diagram.py`, the diagram tool calls it automatically and prints a `[WARN]` up front when the config doesn't look like a Proxy instance.

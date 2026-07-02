@@ -19,7 +19,7 @@ Usage:
 See CHANGELOG.md for version history.
 """
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"
 
 import sys
 import re
@@ -663,6 +663,21 @@ def main():
         print(f'[WARN] {w}')
 
     model = extract_model(entries)
+
+    # B7 — early warning if this doesn't look like an OUD Proxy config.
+    # Soft dependency: oud_config_type.py may not be present alongside this
+    # script (e.g. if only oud_lb_diagram.py was copied out on its own),
+    # in which case this check is silently skipped rather than failing.
+    try:
+        from oud_config_type import classify_ldif_entries
+        primary_type, _secondary, confidence, _signals = classify_ldif_entries(entries)
+        if not primary_type.startswith('OUD Proxy'):
+            print(f'[WARN] Config does not look like an OUD Proxy instance '
+                  f'(detected: "{primary_type}", confidence: {confidence}). '
+                  f'This tool targets OUD Proxy configs specifically — the diagram below '
+                  f'may be empty or incomplete. Run oud_config_type.py for details.')
+    except ImportError:
+        pass
 
     # B4 — warn on unresolved workflow-element DN references
     all_we = set(model['lb_we']) | set(model['proxy_we'])

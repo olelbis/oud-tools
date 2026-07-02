@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.5.0] - 2026-07-02
+
+### Added
+- **New tool: `oud_config_type.py` (E1)** — generic OUD instance classifier.
+  Inspects `ds-cfg-java-class` and objectClass patterns to determine whether
+  a config is an OUD Proxy, OUD Directory Server, a Hybrid (both proxy-LB
+  and a real local data backend present), or inconclusive. Reports evidence
+  (matching DNs) for every signal so the classification can be checked by
+  a human. Can be run standalone: `python oud_config_type.py <config.ldif>`.
+  Distinguishes system/internal local backends (schema, tasks, monitor,
+  backup, trust store) from genuine user-data backends
+  (`ds-cfg-db-local-backend-workflow-element` with
+  `ds-cfg-is-private-backend` not `true`) to avoid false "Hybrid" positives.
+- **Early scope warning (B7)** — `oud_lb_diagram.py` now calls into
+  `oud_config_type.py` (soft dependency — degrades silently if that file
+  isn't present alongside it) and prints a `[WARN]` up front if the loaded
+  config doesn't look like an OUD Proxy instance, since the diagram would
+  otherwise come out empty or misleading on an unsupported config type.
+
+### Notes
+- `oud_config_type.py` currently imports `parse_ldif`/`first` from
+  `oud_lb_diagram.py`; both files must be kept in the same directory.
+  A future refactor (BACKLOG item E2) will extract a standalone
+  `oud_ldif_core.py` module so this dependency direction goes away.
+
+---
+
 ## [1.4.0] - 2026-07-02
 
 ### Added
