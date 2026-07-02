@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.2.0] - 2026-07-02
+
+### Fixed
+- **RFC 4511 line folding** — continuation lines (starting with a single space)
+  are now correctly joined before parsing, preventing truncated values.
+- **base64-encoded values** (`attr:: <b64>`) are now decoded to UTF-8;
+  binary values fall back to hex representation instead of being silently ignored.
+- **URL references** (`attr:< <url>`) are now recognised and stored as-is.
+- **Case-insensitive DN lookup** — all entry keys and DN references from
+  attributes are normalised to lowercase, eliminating silent mismatches on
+  configs with mixed-case DNs.
+- **O(1) algorithm lookup** — `cn=algorithm,<dn>` is now resolved via direct
+  dict lookup instead of a full scan of all entries.
+
+### Added
+- **Parse warnings** — `parse_ldif()` now returns a `(entries, warnings)` tuple;
+  warnings are printed to stdout before the diagram.
+- **Unresolved DN warnings** (B4) — `[WARN]` lines are emitted for any
+  `ds-cfg-workflow-element` or `ds-cfg-ldap-server-extension` reference that
+  cannot be resolved in the parsed entries.
+
+### Changed
+- `parse_ldif()` return signature changed from `entries` to `(entries, warnings)`.
+- Entry CN display now always reads from the `cn` attribute value (preserving
+  original casing) rather than extracting from the lowercased DN key.
+
 ## [1.1.0] - 2026-06-30
 
 ### Added

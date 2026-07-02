@@ -8,10 +8,10 @@ Priority: H=High / M=Medium / L=Low
 
 | # | P | Item |
 |---|---|------|
-| B1 | H | LDIF line continuation (lines starting with space per RFC 4511) |
-| B2 | H | base64 values (`attr:: dmFsdWU=`) silently ignored |
-| B3 | M | DN comparison is case-sensitive in places — normalise to lower consistently |
-| B4 | M | Warn if `ds-cfg-workflow-element` points to an unresolved DN |
+| B1 | ~~H~~ | ~~LDIF line continuation (lines starting with space per RFC 4511)~~ → **done 1.2.0** |
+| B2 | ~~H~~ | ~~base64 values (`attr:: dmFsdWU=`) silently ignored~~ → **done 1.2.0** |
+| B3 | ~~M~~ | ~~DN comparison is case-sensitive in places — normalise to lower consistently~~ → **done 1.2.0** |
+| B4 | ~~M~~ | ~~Warn if `ds-cfg-workflow-element` points to an unresolved DN~~ → **done 1.2.0** |
 | B5 | M | DN collision if two WEs share the same CN on different branches |
 | B6 | L | Network group without workflow shows `base-dn:?` — add explicit warning |
 
@@ -56,4 +56,7 @@ Priority: H=High / M=Medium / L=Low
 | D2 | 1.0.0 | Per-operation weights and priorities |
 | D3 | 1.0.0 | Backend servers summary table |
 | D4 | 1.1.0 | Dynamic diagram width (MIN_W / MAX_W) |
-| D5 | 1.1.0 | `--version` flag |
+| D6 | 1.2.0 | RFC 4511 line folding (B1) |
+| D7 | 1.2.0 | base64 and URL value decoding (B2) |
+| D8 | 1.2.0 | Case-insensitive DN normalisation (B3) |
+| D9 | 1.2.0 | Warn on unresolved DN references (B4) |

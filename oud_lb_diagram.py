@@ -17,45 +17,120 @@ Usage:
 See CHANGELOG.md for version history.
 """
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 import sys
 import re
+import base64
 from collections import defaultdict
 
 MIN_W = 60   # minimum diagram width
 MAX_W = 200  # safety cap so a single rogue line can't blow up the layout
 
 # ─────────────────────────────────────────────────────────────────────────────
-# LDIF PARSER
+# LDIF PARSER  (RFC 4511 compliant)
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _decode_value(sep, raw_val):
+    """
+    Decode an LDIF attribute value based on separator:
+      ':'  → plain UTF-8 string  (strip leading space)
+      '::' → base64-encoded value (decode to UTF-8, fallback to hex repr)
+      ':<' → URL reference (returned as-is)
+    """
+    val = raw_val.lstrip(' ')
+    if sep == '::':
+        try:
+            return base64.b64decode(val).decode('utf-8')
+        except Exception:
+            return base64.b64decode(val).hex()
+    return val   # plain or URL
+
+
+def _fold_lines(fh):
+    """
+    Generator: yield logical LDIF lines by joining RFC 4511 continuations.
+    A line starting with a single space is a continuation of the previous line
+    (the leading space is stripped before joining).
+    Yields '' for blank lines (entry separators).
+    """
+    current = None
+    for raw in fh:
+        line = raw.rstrip('\r\n')
+        if line.startswith(' '):
+            # continuation — append to current logical line (drop leading space)
+            if current is not None:
+                current += line[1:]
+        else:
+            if current is not None:
+                yield current
+            current = line
+    if current is not None:
+        yield current
+
+
 def parse_ldif(path):
-    entries = {}
-    current_dn = None
-    current = defaultdict(list)
+    """
+    Return dict  dn (normalised to lower-case) -> {attr: [values]}.
+    Handles:
+      - RFC 4511 line folding (continuation lines starting with space)
+      - base64-encoded values  (attr:: <b64>)
+      - URL references         (attr:< <url>)  — stored as-is
+      - Comment lines          (# ...)
+      - Case-insensitive attribute names (stored lower-case)
+      - Case-insensitive DN normalisation (stored lower-case)
+    """
+    entries  = {}
+    dn_key   = None   # lower-case DN used as dict key
+    dn_orig  = None   # original DN casing (for display if needed)
+    current  = defaultdict(list)
+    warnings = []
+
     with open(path, encoding='utf-8', errors='replace') as fh:
-        for raw in fh:
-            line = raw.rstrip('\n')
+        for line in _fold_lines(fh):
+
+            # blank line → flush current entry
             if line.strip() == '':
-                if current_dn:
-                    entries[current_dn] = dict(current)
-                current_dn = None
+                if dn_key:
+                    entries[dn_key] = dict(current)
+                dn_key  = None
+                dn_orig = None
                 current = defaultdict(list)
                 continue
-            if line.startswith('#') or ':' not in line:
+
+            # comment
+            if line.startswith('#'):
                 continue
-            key, _, val = line.partition(':')
+
+            # detect separator: '::' before ':', then ':'
+            if '::' in line and line.index('::') < (line.index(':') if ':' in line else 9999):
+                key, sep, raw_val = line.partition('::')
+                sep = '::'
+            elif ':<' in line and line.index(':<') < (line.index(':') if ':' in line else 9999):
+                key, sep, raw_val = line.partition(':<')
+                sep = ':<'
+            elif ':' in line:
+                key, sep, raw_val = line.partition(':')
+                sep = ':'
+            else:
+                continue  # malformed line — skip
+
             key = key.strip().lower()
-            val = val.lstrip(' ').rstrip()
+            val = _decode_value(sep, raw_val)
+
             if key == 'dn':
-                current_dn = val
+                dn_orig = val
+                dn_key  = val.lower()   # normalise for consistent lookup
                 current = defaultdict(list)
-            elif current_dn is not None:
+            elif dn_key is not None:
                 current[key].append(val)
-    if current_dn and current:
-        entries[current_dn] = dict(current)
-    return entries
+            # else: attribute before first dn — skip silently
+
+    # flush last entry (file not ending with blank line)
+    if dn_key and current:
+        entries[dn_key] = dict(current)
+
+    return entries, warnings
 
 
 def first(entry, attr, default=''):
@@ -113,7 +188,7 @@ def extract_model(entries):
         if is_proxy_we(e):
             proxy_we[dn] = {
                 'cn':           first(e, 'cn'),
-                'extension_dn': first(e, 'ds-cfg-ldap-server-extension'),
+                'extension_dn': first(e, 'ds-cfg-ldap-server-extension').lower(),
                 'cred_mode':    first(e, 'ds-cfg-client-cred-mode', '-'),
             }
 
@@ -123,7 +198,7 @@ def extract_model(entries):
             workflows[dn] = {
                 'cn':          first(e, 'cn'),
                 'base_dn':     first(e, 'ds-cfg-base-dn'),
-                'entry_we_dn': first(e, 'ds-cfg-workflow-element'),
+                'entry_we_dn': first(e, 'ds-cfg-workflow-element').lower(),
             }
 
     for dn, e in entries.items():
@@ -132,7 +207,7 @@ def extract_model(entries):
             network_groups.append({
                 'dn':          dn,
                 'cn':          first(e, 'cn'),
-                'workflow_dn': first(e, 'ds-cfg-workflow'),
+                'workflow_dn': first(e, 'ds-cfg-workflow').lower(),
                 'priority':    first(e, 'ds-cfg-priority', '-'),
                 'enabled':     first(e, 'ds-cfg-enabled', 'true'),
             })
@@ -140,24 +215,24 @@ def extract_model(entries):
     for dn, e in entries.items():
         if not is_lb_we(e):
             continue
-        algo_dn   = f'cn=algorithm,{dn}'
+        # keys are already lowercase — direct dict lookup, no scan needed
+        algo_dn   = f'cn=algorithm,{dn}'   # dn is already lowercase
         algorithm = None
-        for adn, ae in entries.items():
-            if adn.lower() == algo_dn.lower():
-                ajc = first(ae, 'ds-cfg-java-class')
-                sb  = first(ae, 'ds-cfg-switch-back', 'false').lower() == 'true'
-                algorithm = {'type': algo_type(ajc), 'switch_back': sb, 'java_class': ajc}
-                break
+        if algo_dn in entries:
+            ae  = entries[algo_dn]
+            ajc = first(ae, 'ds-cfg-java-class')
+            sb  = first(ae, 'ds-cfg-switch-back', 'false').lower() == 'true'
+            algorithm = {'type': algo_type(ajc), 'switch_back': sb, 'java_class': ajc}
 
-        routes_parent = f'cn=routes,cn=algorithm,{dn}'.lower()
+        routes_parent = f'cn=routes,cn=algorithm,{dn}'  # already lowercase
         routes = []
         for rdn, re_ in entries.items():
             if ',' not in rdn:
                 continue
-            parent_dn = rdn.split(',', 1)[1].lower()
+            parent_dn = rdn.split(',', 1)[1]   # already lowercase
             if parent_dn != routes_parent:
                 continue
-            child_we = first(re_, 'ds-cfg-workflow-element')
+            child_we = first(re_, 'ds-cfg-workflow-element').lower()
             ops = ('search','bind','add','modify','delete','compare','modifydn','extended')
 
             # per-operation priorities (failover)
@@ -174,8 +249,10 @@ def extract_model(entries):
                 if w.isdigit():
                     weights[op] = int(w)
 
+            # use cn attribute value (preserves original casing); fallback to cn_of(dn)
+            route_cn = first(re_, 'cn') or cn_of(rdn)
             routes.append({
-                'cn': cn_of(rdn), 'dn': rdn,
+                'cn': route_cn, 'dn': rdn,
                 'we_dn': child_we, 'priorities': priorities, 'weights': weights,
             })
 
@@ -322,8 +399,9 @@ def build_network_groups_section(model):
         sec.add('(none found)')
     for ng in sorted(ngs, key=lambda x: x.get('priority', '0')):
         wf_info = wfs.get(ng['workflow_dn'], {})
+        wf_cn = wf_info.get('cn') or cn_of(ng['workflow_dn'])
         sec.add(f'cn={ng["cn"]}  priority:{ng["priority"]}  enabled:{ng["enabled"]}'
-                f'  →  workflow:{cn_of(ng["workflow_dn"])}  base-dn:{wf_info.get("base_dn","?")}')
+                f'  →  workflow:{wf_cn}  base-dn:{wf_info.get("base_dn","?")}')
     return sec
 
 
@@ -340,7 +418,8 @@ def build_workflow_header_sections(model):
         printed.add(wf_dn)
         wf_info = wfs.get(wf_dn, {})
         base_dn = wf_info.get('base_dn', '?')
-        sec = Section(f'WORKFLOW TREE  —  {cn_of(wf_dn)}  —  base-dn: {base_dn}')
+        wf_cn = wf_info.get('cn') or cn_of(wf_dn)
+        sec = Section(f'WORKFLOW TREE  —  {wf_cn}  —  base-dn: {base_dn}')
         sections.append((wf_dn, wf_info, sec))
     return sections
 
@@ -444,14 +523,35 @@ def main():
 
     path = sys.argv[1] if len(sys.argv) > 1 else 'config.ldif'
     try:
-        entries = parse_ldif(path)
+        entries, parse_warnings = parse_ldif(path)
     except FileNotFoundError:
         print(f'[ERROR] File not found: {path}')
         print('Usage: python oud_lb_diagram.py <path-to-config.ldif>')
         sys.exit(1)
 
     print(f'\n[+] Parsed {len(entries)} LDIF entries from: {path}')
+    for w in parse_warnings:
+        print(f'[WARN] {w}')
+
     model = extract_model(entries)
+
+    # B4 — warn on unresolved workflow-element DN references
+    all_we = set(model['lb_we']) | set(model['proxy_we'])
+    for ng in model['network_groups']:
+        wf_dn = ng['workflow_dn']
+        if wf_dn and wf_dn not in model['workflows']:
+            print(f'[WARN] network-group "{ng["cn"]}" references unknown workflow: {wf_dn}')
+    for wf_dn, wf in model['workflows'].items():
+        if wf['entry_we_dn'] and wf['entry_we_dn'] not in all_we:
+            print(f'[WARN] workflow "{wf["cn"]}" references unknown WE: {wf["entry_we_dn"]}')
+    for lb_dn, lb in model['lb_we'].items():
+        for r in lb['routes']:
+            if r['we_dn'] and r['we_dn'] not in all_we:
+                print(f'[WARN] route "{r["cn"]}" in "{lb["cn"]}" references unknown WE: {r["we_dn"]}')
+    for pwe_dn, pwe in model['proxy_we'].items():
+        if pwe['extension_dn'] and pwe['extension_dn'] not in model['extensions']:
+            print(f'[WARN] proxy-we "{pwe["cn"]}" references unknown extension: {pwe["extension_dn"]}')
+
     print(f'[+] Found: {len(model["network_groups"])} network group(s)  '
           f'{len(model["workflows"])} workflow(s)  '
           f'{len(model["lb_we"])} LB WE(s)  '
