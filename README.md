@@ -7,7 +7,7 @@ A command-line utility to parse Oracle Unified Directory (OUD) proxy configurati
 ## Requirements
 
 - Python 3.6+
-- No external dependencies (standard library only)
+- No external dependencies (standard library only — `re`, `base64`, `collections`)
 
 ---
 
@@ -38,6 +38,8 @@ The script reads the OUD proxy `config.ldif` file and:
 4. **Prints a backend servers table** summarising all proxy WEs and their resolved extensions
 5. **Prints a legend** explaining the notation
 6. **Adapts the diagram width** automatically to the longest line of content (with safety bounds), so the frame never looks cramped or needlessly wide
+7. **Parses LDIF robustly** — handles RFC 4511 line folding (continuation lines), base64-encoded values, and case-insensitive DN references
+8. **Warns on unresolved references** — flags any workflow-element or extension DN that cannot be resolved in the parsed config
 
 ---
 
@@ -121,6 +123,15 @@ The script reads the OUD proxy `config.ldif` file and:
 
 > Note: the diagram frame width above adapts automatically to the longest line in the loaded config (bounded between `MIN_W=60` and `MAX_W=200` columns) — your output may be narrower or wider depending on attribute lengths, DN depth, and IP formats.
 
+If the config contains a network group without an associated workflow, or a workflow-element / extension reference that cannot be resolved, warnings are printed before the diagram:
+
+```
+[+] Parsed 316 LDIF entries from: config.ldif
+[WARN] network-group "Network Group" references unknown workflow: 
+[WARN] proxy-we "proxy-we7" references unknown extension: cn=proxy7,cn=extensions,cn=config
+[+] Found: 2 network group(s)  1 workflow(s)  6 LB WE(s)  7 proxy WE(s)  6 backend extension(s)
+```
+
 ---
 
 ## How to read the diagram
@@ -145,6 +156,14 @@ Supported load-balancing algorithm types:
 - `PROPORTIONAL` — weight-based distribution per operation
 - `FAILOVER` — single active node with priority-based fallback
 - `ROUND-ROBIN` — sequential cycling (if present in config)
+
+### Parser
+
+The LDIF parser is RFC 4511 compliant:
+- Continuation lines (starting with a single space) are folded into the previous logical line
+- Base64-encoded values (`attr:: <b64>`) are decoded to UTF-8, with hex fallback for binary content
+- URL references (`attr:< <url>`) are recognised and stored as-is
+- All DNs (entry keys and cross-references) are normalised to lowercase for consistent lookup, regardless of the original casing in the config; display labels still use the original-case `cn` attribute value
 
 ---
 

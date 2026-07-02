@@ -52,9 +52,7 @@ Priority: H=High / M=Medium / L=Low
 
 | # | P | Item |
 |---|---|------|
-| P1 | M | Update README to reflect v1.2.0 (parser fixes, warnings) |
-| P2 | L | Create GitHub release with changelog notes (v1.2.0) |
-| P3 | L | Evaluate second tool in repo (e.g. OUD config validator/linter) |
+| P3 | L | **Planned, not started.** Second tool: `oud_config_lint.py` — validator/linter for OUD proxy configs. Scope TBD: candidate checks = orphan/broken DN references (reuses existing parser), SSL/timeout/pool-size best practices, disabled-but-referenced WEs, unbalanced failover priorities. |
 
 ---
 
@@ -70,3 +68,5 @@ Priority: H=High / M=Medium / L=Low
 | D7 | 1.2.0 | base64 and URL value decoding (B2) |
 | D8 | 1.2.0 | Case-insensitive DN normalisation (B3) |
 | D9 | 1.2.0 | Warn on unresolved DN references (B4) |
+| P1 | 1.2.0 | README updated with v1.2.0 parser fixes |
+| P2 | 1.2.0 | Release notes drafted for v1.2.0 |
