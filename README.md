@@ -200,12 +200,25 @@ python oud_lb_diagram.py --version
 
 ---
 
+## Testing
+
+A basic unit test suite covers LDIF parsing and model extraction:
+
+```bash
+python3 -m unittest test_oud_lb_diagram.py -v
+```
+
+No external dependencies — uses only the standard library `unittest` module.
+
+---
+
 ## Files
 
 | File | Description |
 |---|---|
 | `oud_lb_diagram.py` | Main script — load balancing diagram |
 | `oud_config_type.py` | OUD instance classifier (Proxy / Directory Server / Hybrid). Run standalone or used automatically by `oud_lb_diagram.py` for an early scope warning. |
+| `test_oud_lb_diagram.py` | Unit test suite (parser + model extraction) |
 | `README.md` | This file |
 | `CHANGELOG.md` | Version history |
 | `BACKLOG.md` | Planned work |

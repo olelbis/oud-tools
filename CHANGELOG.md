@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.6.0] - 2026-07-02
+
+### Added
+- **`test_oud_lb_diagram.py` (C3)** — basic unit test suite (30 tests,
+  standard library `unittest`, no external dependencies). Covers LDIF
+  parsing (line folding, base64, comments, blank-line separation, DN/attr
+  case normalisation), small utilities (`cn_of`, classifiers, `algo_type`),
+  formatters (`fmt_weights`, `fmt_priorities`), each `_extract_*` function
+  in isolation, a full `extract_model()` integration test against a small
+  synthetic proxy config, and `find_duplicate_cn_warnings()` (B5).
+  Run with `python3 -m unittest test_oud_lb_diagram.py -v`.
+
+### Fixed
+- **Base64 value decoding never actually triggered (regression from 1.2.0,
+  caught by the new test suite).** The separator-detection logic compared
+  the position of `'::'`/`':<'` against the position of the first `':'` —
+  but since both start with `:`, that position is always identical, so the
+  condition never fired and the base64/URL branches were unreachable in
+  practice. Every `attr:: <b64>` line was silently misparsed as plain text
+  containing a stray leading `:`. Rewritten to inspect the character
+  immediately following the first colon instead of comparing substring
+  positions. No change in behaviour for configs without base64/URL values
+  (verified byte-for-byte identical output on the real test config).
+
+---
+
 ## [1.5.2] - 2026-07-02
 
 ### Changed

@@ -19,7 +19,7 @@ Usage:
 See CHANGELOG.md for version history.
 """
 
-__version__ = "1.5.2"
+__version__ = "1.6.0"
 
 import sys
 import re
@@ -105,18 +105,22 @@ def parse_ldif(path):
             if line.startswith('#'):
                 continue
 
-            # detect separator: '::' before ':', then ':'
-            if '::' in line and line.index('::') < (line.index(':') if ':' in line else 9999):
-                key, sep, raw_val = line.partition('::')
-                sep = '::'
-            elif ':<' in line and line.index(':<') < (line.index(':') if ':' in line else 9999):
-                key, sep, raw_val = line.partition(':<')
-                sep = ':<'
-            elif ':' in line:
-                key, sep, raw_val = line.partition(':')
-                sep = ':'
-            else:
+            # detect separator by inspecting what follows the FIRST colon
+            # (the previous approach compared '::'/':<' position against the
+            # first ':' position, but since '::' and ':<' always start with
+            # ':', that position is identical — the comparison never fired
+            # and base64/URL values were silently misparsed as plain text)
+            colon_pos = line.find(':')
+            if colon_pos == -1:
                 continue  # malformed line — skip
+            key = line[:colon_pos]
+            rest = line[colon_pos + 1:]
+            if rest.startswith(':'):
+                sep, raw_val = '::', rest[1:]
+            elif rest.startswith('<'):
+                sep, raw_val = ':<', rest[1:]
+            else:
+                sep, raw_val = ':', rest
 
             key = key.strip().lower()
             val = _decode_value(sep, raw_val)
