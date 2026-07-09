@@ -15,11 +15,12 @@ Usage:
     python oud_lb_diagram.py --version                 # print version and exit
     python oud_lb_diagram.py <config> --output <file>   # save diagram to file instead of stdout
     python oud_lb_diagram.py <config> --no-tree          # print only network groups + backend table
+    python oud_lb_diagram.py <config> --anonymize        # mask real backend IPs with RFC 5737 placeholders
 
 See CHANGELOG.md for version history.
 """
 
-__version__ = "1.6.0"
+__version__ = "1.7.0"
 
 import sys
 import re
@@ -619,8 +620,9 @@ def parse_args(argv):
       --version / -v        print version and exit
       --output <file>       write diagram to file instead of stdout
       --no-tree             skip workflow tree section(s)
+      --anonymize           replace real backend IPs with documentation-range placeholders
     """
-    args = {'path': None, 'output': None, 'no_tree': False, 'version': False}
+    args = {'path': None, 'output': None, 'no_tree': False, 'version': False, 'anonymize': False}
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -634,6 +636,8 @@ def parse_args(argv):
             args['output'] = argv[i]
         elif a == '--no-tree':
             args['no_tree'] = True
+        elif a == '--anonymize':
+            args['anonymize'] = True
         elif a.startswith('--'):
             print(f'[ERROR] Unknown option: {a}')
             sys.exit(1)
@@ -677,6 +681,46 @@ def find_duplicate_cn_warnings(model):
     return warnings
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# ANONYMIZATION  (F3)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# RFC 5737 documentation ranges — safe to publish, never routable.
+ANONYMIZE_RANGES = ['198.51.100', '203.0.113', '192.0.2']
+
+
+def anonymize_model(model):
+    """
+    Replace every real backend IP in model['extensions'] with a placeholder
+    from an RFC 5737 documentation range, using a stable mapping so the same
+    real IP always maps to the same placeholder (needed since the same
+    extension can be referenced by multiple proxy WEs / routes).
+    Mutates model in place. Returns the number of unique IPs replaced.
+    """
+    mapping = {}
+    next_index = 1
+
+    # deterministic order: sort by DN so repeated runs produce the same mapping
+    for dn in sorted(model['extensions'].keys()):
+        ext = model['extensions'][dn]
+        real_ip = ext.get('address', '')
+        if not real_ip or real_ip == '?':
+            continue
+        if real_ip not in mapping:
+            range_idx = (next_index - 1) // 254
+            octet     = ((next_index - 1) % 254) + 1
+            if range_idx >= len(ANONYMIZE_RANGES):
+                # exhausted all documentation ranges — extremely unlikely,
+                # fall back to a clearly-fake but non-standard marker
+                mapping[real_ip] = f'198.51.100.{octet}-overflow{range_idx}'
+            else:
+                mapping[real_ip] = f'{ANONYMIZE_RANGES[range_idx]}.{octet}'
+            next_index += 1
+        ext['address'] = mapping[real_ip]
+
+    return len(mapping)
+
+
 def main():
     args = parse_args(sys.argv[1:])
 
@@ -698,6 +742,11 @@ def main():
         print(f'[WARN] {w}')
 
     model = extract_model(entries)
+
+    if args['anonymize']:
+        n = anonymize_model(model)
+        print(f'[+] --anonymize: replaced {n} unique backend IP(s) with '
+              f'RFC 5737 documentation-range placeholders')
 
     # B7 — early warning if this doesn't look like an OUD Proxy config.
     # Soft dependency: oud_config_type.py may not be present alongside this

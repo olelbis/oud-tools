@@ -31,6 +31,7 @@ from oud_lb_diagram import (
     _extract_network_groups, _extract_lb_we,
     extract_model,
     find_duplicate_cn_warnings,
+    anonymize_model,
 )
 
 
@@ -352,6 +353,55 @@ cn: proxy-we1
             warnings = find_duplicate_cn_warnings(model)
             self.assertEqual(len(warnings), 1)
             self.assertIn('proxy-we1', warnings[0])
+        finally:
+            os.remove(path)
+
+
+class TestAnonymize(unittest.TestCase):
+    def setUp(self):
+        self.path = write_ldif(MINI_CONFIG)
+        entries, _ = parse_ldif(self.path)
+        self.model = extract_model(entries)
+
+    def tearDown(self):
+        os.remove(self.path)
+
+    def test_replaces_real_ip(self):
+        count = anonymize_model(self.model)
+        self.assertEqual(count, 1)
+        ext = list(self.model['extensions'].values())[0]
+        self.assertNotEqual(ext['address'], '10.0.0.1')
+        self.assertTrue(ext['address'].startswith('198.51.100.'))
+
+    def test_is_deterministic_across_calls(self):
+        anonymize_model(self.model)
+        first_ip = list(self.model['extensions'].values())[0]['address']
+        # re-extract fresh model and anonymize again — same mapping order in, same result out
+        entries, _ = parse_ldif(self.path)
+        model2 = extract_model(entries)
+        anonymize_model(model2)
+        second_ip = list(model2['extensions'].values())[0]['address']
+        self.assertEqual(first_ip, second_ip)
+
+    def test_same_real_ip_maps_to_same_placeholder(self):
+        # add a second extension entry sharing the same real IP as ext1
+        dup_config = MINI_CONFIG + """
+dn: cn=ext2,cn=Extensions,cn=config
+objectClass: ds-cfg-extension
+objectClass: top
+objectClass: ds-cfg-ldap-server-extension
+ds-cfg-java-class: com.sun.dps.server.workflowelement.proxyldap.LDAPServerExtension
+ds-cfg-remote-ldap-server-address: 10.0.0.1
+ds-cfg-remote-ldap-server-port: 389
+cn: ext2
+"""
+        path = write_ldif(dup_config)
+        try:
+            entries, _ = parse_ldif(path)
+            model = extract_model(entries)
+            anonymize_model(model)
+            addrs = {ext['address'] for ext in model['extensions'].values()}
+            self.assertEqual(len(addrs), 1)  # same real IP -> same placeholder
         finally:
             os.remove(path)
 

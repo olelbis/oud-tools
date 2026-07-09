@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.7.0] - 2026-07-02
+
+### Added
+- **`--anonymize` flag (F3)** — replaces real backend IPs with placeholders
+  from RFC 5737 documentation ranges (`198.51.100.0/24`, `203.0.113.0/24`,
+  `192.0.2.0/24` — safe to publish, never routable). Mapping is applied at
+  the model level (`model['extensions']`) before rendering, so both the
+  workflow tree and the backend servers table show the same placeholder
+  consistently. The mapping is deterministic (sorted by DN) and stable:
+  the same real IP always maps to the same placeholder, even if referenced
+  by multiple proxy WEs. Prints a one-line confirmation
+  (`[+] --anonymize: replaced N unique backend IP(s) ...`) to stdout, same
+  as other status lines — never written into a file targeted by `--output`.
+  Combines freely with `--output` and `--no-tree`.
+- **3 new unit tests** covering `anonymize_model()`: basic replacement,
+  determinism across repeated runs, and stable mapping when the same real
+  IP is shared by two different extension entries.
+
+### Notes
+- No change in behaviour when `--anonymize` is not passed — verified
+  byte-for-byte identical output against v1.6.0.
+
+---
+
 ## [1.6.0] - 2026-07-02
 
 ### Added

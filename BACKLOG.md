@@ -44,7 +44,7 @@ Priority: H=High / M=Medium / L=Low
 |---|---|------|
 | F1 | ~~M~~ | ~~`--output <file>` flag to save diagram to disk~~ → **done 1.3.0** |
 | F2 | ~~M~~ | ~~`--no-tree` flag to print only backend table (quick summary mode)~~ → **done 1.3.0** |
-| F3 | L | `--anonymize` flag to mask IPs in output |
+| F3 | ~~L~~ | ~~`--anonymize` flag to mask IPs in output~~ → **done 1.7.0** |
 | F4 | L | JSON/YAML output mode for machine-readable consumption |
 
 ---
@@ -94,3 +94,4 @@ Priority: H=High / M=Medium / L=Low
 | D19 | 1.5.1 | Fixed silent B6 case: empty ds-cfg-workflow now warns explicitly |
 | D20 | 1.5.2 | Split extract_model() into focused per-object extractors (C1) |
 | D21 | 1.6.0 | Unit test suite (30 tests) added; caught & fixed real base64 parsing bug (C3) |
+| D22 | 1.7.0 | `--anonymize` flag with deterministic IP masking (F3) |
