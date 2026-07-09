@@ -34,8 +34,15 @@ python oud_lb_diagram.py --version                             # print version a
 python oud_lb_diagram.py <config> --output <file>               # save diagram to file
 python oud_lb_diagram.py <config> --no-tree                     # skip workflow tree(s), print only summary + backend table
 python oud_lb_diagram.py <config> --anonymize                   # mask real backend IPs with RFC 5737 placeholders
-python oud_lb_diagram.py <config> --output report.txt --no-tree --anonymize  # combine all three
+python oud_lb_diagram.py <config> --format json                 # output the parsed model as JSON (pipeable — diagnostics go to stderr)
+python oud_lb_diagram.py <config> --format json --anonymize | jq .model.extensions
+python oud_lb_diagram.py <config> --output report.txt --no-tree --anonymize  # combine flags freely
 ```
+
+`--format json` is the only alternative to the default `text` format. YAML
+isn't offered — it isn't in the Python standard library and this project
+has zero external dependencies — pipe the JSON through a converter
+(`yq`, `python -c "import sys,yaml,json; ..."`, etc.) if you need YAML.
 
 If no argument is provided, the script looks for `config.ldif` in the current directory.
 
@@ -60,6 +67,8 @@ The script reads the OUD proxy `config.ldif` file and:
 7. **Parses LDIF robustly** — handles RFC 4511 line folding (continuation lines), base64-encoded values, and case-insensitive DN references
 8. **Warns on unresolved references** — flags any workflow-element or extension DN that cannot be resolved in the parsed config
 9. **Can anonymize backend IPs on demand** (`--anonymize`) — replaces real IPs with stable RFC 5737 documentation-range placeholders, useful when sharing diagrams outside the team
+10. **Highlights disabled components** — proxy WEs and their backend extensions each track their own `ds-cfg-enabled` state; either one being `false` shows a `⚠ DISABLED` marker in both the workflow tree and the backend servers table
+11. **Can emit structured JSON** (`--format json`) instead of the ASCII diagram, for scripting/automation — diagnostics go to stderr so stdout stays pure, pipeable JSON
 
 ---
 

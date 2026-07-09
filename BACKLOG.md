@@ -34,7 +34,7 @@ Priority: H=High / M=Medium / L=Low
 |---|---|------|
 | O1 | ~~M~~ | ~~Deep tree branches can exceed `MAX_W` — account for indentation in width calc~~ → **done 1.4.0** |
 | O2 | ~~M~~ | ~~Workflow tree body unframed — consider consistent boxing with other sections~~ → **done 1.4.0** |
-| O3 | L | Highlight disabled WEs (`ds-cfg-enabled: false`) more visibly (e.g. `[DISABLED]` in red or `!!`) |
+| O3 | ~~L~~ | ~~Highlight disabled WEs more visibly~~ → **done 1.9.0** — extended to proxy WE + extensions too, not just LB WE |
 
 ---
 
@@ -45,7 +45,7 @@ Priority: H=High / M=Medium / L=Low
 | F1 | ~~M~~ | ~~`--output <file>` flag to save diagram to disk~~ → **done 1.3.0** |
 | F2 | ~~M~~ | ~~`--no-tree` flag to print only backend table (quick summary mode)~~ → **done 1.3.0** |
 | F3 | ~~L~~ | ~~`--anonymize` flag to mask IPs in output~~ → **done 1.7.0** |
-| F4 | L | JSON/YAML output mode for machine-readable consumption |
+| F4 | ~~L~~ | ~~JSON/YAML output mode~~ → **done 1.9.0 (JSON only** — YAML needs an external dependency, out of scope for this project)** |
 
 ---
 
@@ -96,3 +96,5 @@ Priority: H=High / M=Medium / L=Low
 | D21 | 1.6.0 | Unit test suite (30 tests) added; caught & fixed real base64 parsing bug (C3) |
 | D22 | 1.7.0 | `--anonymize` flag with deterministic IP masking (F3) |
 | D23 | 1.8.0 | Extracted shared `oud_ldif_core.py`; oud_config_type.py migrated off oud_lb_diagram (E2) |
+| D24 | 1.9.0 | Disabled WE/extension highlighting extended beyond LB WE (O3) |
+| D25 | 1.9.0 | `--format json` output mode with stdout/stderr split (F4) |

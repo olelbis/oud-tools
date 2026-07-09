@@ -16,14 +16,16 @@ Usage:
     python oud_lb_diagram.py <config> --output <file>   # save diagram to file instead of stdout
     python oud_lb_diagram.py <config> --no-tree          # print only network groups + backend table
     python oud_lb_diagram.py <config> --anonymize        # mask real backend IPs with RFC 5737 placeholders
+    python oud_lb_diagram.py <config> --format json      # output the parsed model as JSON instead of the ASCII diagram
 
 See CHANGELOG.md for version history.
 """
 
-__version__ = "1.8.0"
+__version__ = "1.9.0"
 
 import sys
 import io
+import json
 from collections import defaultdict
 
 try:
@@ -91,6 +93,7 @@ def _extract_extensions(entries):
                 'conn_timeout':first(e, 'ds-cfg-remote-ldap-server-connect-timeout', '-'),
                 'read_timeout':first(e, 'ds-cfg-remote-ldap-server-read-timeout', '-'),
                 'ssl_trust_all':first(e, 'ds-cfg-ssl-trust-all', 'false'),
+                'enabled':     first(e, 'ds-cfg-enabled', 'true'),
             }
     return extensions
 
@@ -104,6 +107,7 @@ def _extract_proxy_we(entries):
                 'cn':           first(e, 'cn'),
                 'extension_dn': first(e, 'ds-cfg-ldap-server-extension').lower(),
                 'cred_mode':    first(e, 'ds-cfg-client-cred-mode', '-'),
+                'enabled':      first(e, 'ds-cfg-enabled', 'true'),
             }
     return proxy_we
 
@@ -263,6 +267,17 @@ def fmt_algo(algo):
 # RECURSIVE TREE RENDERER
 # ─────────────────────────────────────────────────────────────────────────────
 
+def disabled_marker(*enabled_flags):
+    """
+    O3 — return a visible marker if any given ds-cfg-enabled value is 'false'.
+    Used for both LB WE nodes and proxy WE leaves so a disabled component is
+    never silently indistinguishable from an active one in the diagram.
+    """
+    if any(str(f).lower() == 'false' for f in enabled_flags):
+        return '  ⚠ DISABLED'
+    return ''
+
+
 def render_tree(we_dn, model, prefix='', is_last=True, file=None):
     lb_we      = model['lb_we']
     proxy_we   = model['proxy_we']
@@ -280,15 +295,18 @@ def render_tree(we_dn, model, prefix='', is_last=True, file=None):
         ssl  = ext.get('ssl_port', '?')
         pol  = ext.get('ssl_policy', '?')
         cred = p.get('cred_mode', '?')
+        # flag disablement at either the WE level or the underlying extension
+        # level — either one means this route is effectively unusable
+        marker = disabled_marker(p.get('enabled', 'true'), ext.get('enabled', 'true'))
         print(f'{prefix}{connector}{p["cn"]}'
               f'  →  {addr}  port:{port}  SSL:{ssl}  ({pol})'
-              f'  cred:{cred}', file=file)
+              f'  cred:{cred}{marker}', file=file)
         return
 
     # ── LB WE ────────────────────────────────────────────────────────────────
     if we_dn in lb_we:
         info = lb_we[we_dn]
-        enab = '' if info['enabled'] == 'true' else '  [DISABLED]'
+        enab = disabled_marker(info['enabled'])
         print(f'{prefix}{connector}{info["cn"]}  {fmt_algo(info["algorithm"])}{enab}', file=file)
 
         routes = info['routes']
@@ -413,10 +431,11 @@ def build_backend_servers_section(model):
     for pwe_dn in sorted(pwe.keys(), key=lambda d: pwe[d]['cn']):
         p   = pwe[pwe_dn]
         ext = exts.get(p['extension_dn'], {})
+        marker = disabled_marker(p.get('enabled', 'true'), ext.get('enabled', 'true'))
         sec.add(f'{ext.get("cn","?"):<{COL_EXTENSION}}  {p["cn"]:<{COL_WE}}  '
                 f'{ext.get("address","?"):<{COL_IP}}  {ext.get("port","?"):<{COL_PORT}}  '
                 f'{ext.get("ssl_port","?"):<{COL_SSL}}  {ext.get("ssl_policy","?"):<{COL_POLICY}}  '
-                f'{ext.get("pool_max","?"):<{COL_POOL}}  {p.get("cred_mode","?")}')
+                f'{ext.get("pool_max","?"):<{COL_POOL}}  {p.get("cred_mode","?")}{marker}')
     return sec
 
 
@@ -430,6 +449,7 @@ def build_legend_section():
         'ROUND-ROBIN    Cycles through available routes in order.',
         '└─ <node>      Leaf node = backend proxy WE resolved to IP:port.',
         'cred-mode      How client credentials are forwarded to the backend.',
+        '⚠ DISABLED     ds-cfg-enabled: false on this WE or its backend extension — inactive.',
     ]:
         sec.add(l)
     return sec
@@ -505,11 +525,16 @@ def parse_args(argv):
     Supports:
       <path>                positional config file (optional, default 'config.ldif')
       --version / -v        print version and exit
-      --output <file>       write diagram to file instead of stdout
-      --no-tree             skip workflow tree section(s)
+      --output <file>       write diagram/JSON to file instead of stdout
+      --no-tree             skip workflow tree section(s) (text format only)
       --anonymize           replace real backend IPs with documentation-range placeholders
+      --format text|json    output format (default: text). YAML isn't offered
+                             since it isn't in the standard library and this
+                             project has no external dependencies — pipe the
+                             JSON output through a YAML converter if needed.
     """
-    args = {'path': None, 'output': None, 'no_tree': False, 'version': False, 'anonymize': False}
+    args = {'path': None, 'output': None, 'no_tree': False, 'version': False,
+            'anonymize': False, 'format': 'text'}
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -525,6 +550,19 @@ def parse_args(argv):
             args['no_tree'] = True
         elif a == '--anonymize':
             args['anonymize'] = True
+        elif a == '--format':
+            i += 1
+            if i >= len(argv):
+                print('[ERROR] --format requires a value (text or json)')
+                sys.exit(1)
+            fmt = argv[i]
+            if fmt not in ('text', 'json'):
+                print(f'[ERROR] Unsupported --format value: {fmt!r} '
+                      f'(supported: text, json — YAML requires an external '
+                      f'dependency not used by this project; convert the '
+                      f'JSON output instead if you need YAML)')
+                sys.exit(1)
+            args['format'] = fmt
         elif a.startswith('--'):
             print(f'[ERROR] Unknown option: {a}')
             sys.exit(1)
@@ -615,6 +653,13 @@ def main():
         print(f'oud_lb_diagram.py v{__version__}')
         sys.exit(0)
 
+    # When emitting JSON, all diagnostic/status lines go to stderr so that
+    # stdout stays pure, pipeable JSON even without --output (e.g. so that
+    # `oud_lb_diagram.py config.ldif --format json | jq .` works cleanly).
+    # In text mode (default) diagnostics stay on stdout, unchanged from
+    # every previous version.
+    diag = sys.stderr if args['format'] == 'json' else sys.stdout
+
     path = args['path']
     try:
         entries, parse_warnings = parse_ldif(path)
@@ -623,17 +668,18 @@ def main():
         print('Usage: python oud_lb_diagram.py <path-to-config.ldif> [--output <file>] [--no-tree]')
         sys.exit(1)
 
-    # Header / warnings always go to stdout, even when the diagram is saved to file
-    print(f'\n[+] Parsed {len(entries)} LDIF entries from: {path}')
+    # Header / warnings always go to `diag`, even when the diagram/JSON is
+    # saved to a file via --output
+    print(f'\n[+] Parsed {len(entries)} LDIF entries from: {path}', file=diag)
     for w in parse_warnings:
-        print(f'[WARN] {w}')
+        print(f'[WARN] {w}', file=diag)
 
     model = extract_model(entries)
 
     if args['anonymize']:
         n = anonymize_model(model)
         print(f'[+] --anonymize: replaced {n} unique backend IP(s) with '
-              f'RFC 5737 documentation-range placeholders')
+              f'RFC 5737 documentation-range placeholders', file=diag)
 
     # B7 — early warning if this doesn't look like an OUD Proxy config.
     # Soft dependency: oud_config_type.py may not be present alongside this
@@ -646,7 +692,7 @@ def main():
             print(f'[WARN] Config does not look like an OUD Proxy instance '
                   f'(detected: "{primary_type}", confidence: {confidence}). '
                   f'This tool targets OUD Proxy configs specifically — the diagram below '
-                  f'may be empty or incomplete. Run oud_config_type.py for details.')
+                  f'may be empty or incomplete. Run oud_config_type.py for details.', file=diag)
     except ImportError:
         pass
 
@@ -661,35 +707,57 @@ def main():
         wf_dn = ng['workflow_dn']
         if not wf_dn:
             print(f'[WARN] network-group "{ng["cn"]}" has no workflow configured '
-                  f'(ds-cfg-workflow is empty) — it will show as base-dn:? with no tree.')
+                  f'(ds-cfg-workflow is empty) — it will show as base-dn:? with no tree.', file=diag)
         elif wf_dn not in model['workflows']:
-            print(f'[WARN] network-group "{ng["cn"]}" references unknown workflow: {wf_dn}')
+            print(f'[WARN] network-group "{ng["cn"]}" references unknown workflow: {wf_dn}', file=diag)
     for wf_dn, wf in model['workflows'].items():
         if wf['entry_we_dn'] and wf['entry_we_dn'] not in all_we:
-            print(f'[WARN] workflow "{wf["cn"]}" references unknown WE: {wf["entry_we_dn"]}')
+            print(f'[WARN] workflow "{wf["cn"]}" references unknown WE: {wf["entry_we_dn"]}', file=diag)
     for lb_dn, lb in model['lb_we'].items():
         for r in lb['routes']:
             if r['we_dn'] and r['we_dn'] not in all_we:
-                print(f'[WARN] route "{r["cn"]}" in "{lb["cn"]}" references unknown WE: {r["we_dn"]}')
+                print(f'[WARN] route "{r["cn"]}" in "{lb["cn"]}" references unknown WE: {r["we_dn"]}', file=diag)
     for pwe_dn, pwe in model['proxy_we'].items():
         if pwe['extension_dn'] and pwe['extension_dn'] not in model['extensions']:
-            print(f'[WARN] proxy-we "{pwe["cn"]}" references unknown extension: {pwe["extension_dn"]}')
+            print(f'[WARN] proxy-we "{pwe["cn"]}" references unknown extension: {pwe["extension_dn"]}', file=diag)
 
     # B5 — warn on duplicate display CNs (routing correctness unaffected)
     for w in find_duplicate_cn_warnings(model):
-        print(f'[WARN] {w}')
+        print(f'[WARN] {w}', file=diag)
 
     print(f'[+] Found: {len(model["network_groups"])} network group(s)  '
           f'{len(model["workflows"])} workflow(s)  '
           f'{len(model["lb_we"])} LB WE(s)  '
           f'{len(model["proxy_we"])} proxy WE(s)  '
-          f'{len(model["extensions"])} backend extension(s)')
+          f'{len(model["extensions"])} backend extension(s)', file=diag)
 
-    if args['output']:
+    if args['format'] == 'json':
+        if args['no_tree']:
+            print('[+] Note: --no-tree has no effect with --format json '
+                  '(the JSON payload always contains the full model).', file=diag)
+        payload = {
+            'tool': 'oud_lb_diagram.py',
+            'tool_version': __version__,
+            'source_file': path,
+            'anonymized': args['anonymize'],
+            'model': model,
+        }
+        json_text = json.dumps(payload, indent=2, ensure_ascii=False)
+        if args['output']:
+            try:
+                with open(args['output'], 'w', encoding='utf-8') as out:
+                    out.write(json_text + '\n')
+                print(f'[+] JSON written to: {args["output"]}', file=diag)
+            except OSError as ex:
+                print(f'[ERROR] Could not write to {args["output"]}: {ex}', file=diag)
+                sys.exit(1)
+        else:
+            print(json_text)
+    elif args['output']:
         try:
             with open(args['output'], 'w', encoding='utf-8') as out:
                 print_diagram(model, file=out, no_tree=args['no_tree'])
-            print(f'[+] Diagram written to: {args["output"]}')
+            print(f'[+] Diagram written to: {args["output"]}', file=diag)
         except OSError as ex:
             print(f'[ERROR] Could not write to {args["output"]}: {ex}')
             sys.exit(1)

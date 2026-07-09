@@ -32,6 +32,7 @@ from oud_lb_diagram import (
     extract_model,
     find_duplicate_cn_warnings,
     anonymize_model,
+    disabled_marker,
 )
 
 
@@ -404,6 +405,44 @@ cn: ext2
             self.assertEqual(len(addrs), 1)  # same real IP -> same placeholder
         finally:
             os.remove(path)
+
+
+class TestDisabledMarker(unittest.TestCase):
+    def test_no_marker_when_all_enabled(self):
+        self.assertEqual(disabled_marker('true', 'true'), '')
+
+    def test_marker_when_any_flag_false(self):
+        self.assertIn('DISABLED', disabled_marker('true', 'false'))
+        self.assertIn('DISABLED', disabled_marker('false', 'true'))
+        self.assertIn('DISABLED', disabled_marker('false'))
+
+    def test_case_insensitive(self):
+        self.assertIn('DISABLED', disabled_marker('FALSE'))
+        self.assertEqual(disabled_marker('TRUE'), '')
+
+
+class TestExtractProxyWeAndExtensionsTrackEnabled(unittest.TestCase):
+    """O3 — proxy WEs and extensions must expose their enabled state so
+    render_tree/backend table can flag disabled components."""
+
+    def setUp(self):
+        self.path = write_ldif(MINI_CONFIG)
+        self.entries, _ = parse_ldif(self.path)
+
+    def tearDown(self):
+        os.remove(self.path)
+
+    def test_proxy_we_has_enabled_field(self):
+        pwe = _extract_proxy_we(self.entries)
+        p = list(pwe.values())[0]
+        self.assertIn('enabled', p)
+        self.assertEqual(p['enabled'], 'true')  # MINI_CONFIG doesn't set it explicitly -> default
+
+    def test_extension_has_enabled_field(self):
+        exts = _extract_extensions(self.entries)
+        ext = list(exts.values())[0]
+        self.assertIn('enabled', ext)
+        self.assertEqual(ext['enabled'], 'true')
 
 
 if __name__ == '__main__':

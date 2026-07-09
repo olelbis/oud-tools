@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.9.0] - 2026-07-02
+
+### Added
+- **`--format json` flag (F4)** — outputs the full parsed model as
+  structured JSON instead of the ASCII diagram, wrapped in a small envelope
+  (`tool`, `tool_version`, `source_file`, `anonymized`, `model`). Combines
+  with `--anonymize` and `--output`. YAML is intentionally not offered —
+  it isn't in the Python standard library and this project has no external
+  dependencies; pipe the JSON through a converter if YAML is needed.
+  `--no-tree` has no effect in JSON mode (the payload always contains the
+  full model) and prints a one-line note to that effect.
+- **Disabled-component highlighting (O3)** — `proxy_we` and `extensions`
+  entries now track their own `ds-cfg-enabled` state (previously only
+  `lb_we` did). Both the workflow tree and the backend servers table now
+  show a `⚠ DISABLED` marker whenever a proxy WE **or** its underlying
+  extension is disabled — either one makes that route effectively unusable,
+  so both are checked. New shared `disabled_marker()` helper used
+  consistently in both places instead of the LB-WE-only inline check from
+  earlier versions. Documented in the legend.
+- **5 new unit tests**: 3 for `disabled_marker()`, 2 confirming `proxy_we`/
+  `extensions` extraction expose the `enabled` field. Suite now at 38 tests
+  in `test_oud_lb_diagram.py` (52 combined with `test_oud_ldif_core.py`).
+
+### Changed
+- **stdout/stderr split for JSON mode.** All diagnostic/status lines
+  (`[+] Parsed ...`, `[WARN] ...`, `[+] Found ...`, etc.) are now written to
+  **stderr** when `--format json` is active, so stdout carries pure,
+  pipeable JSON even without `--output`
+  (e.g. `oud_lb_diagram.py config.ldif --format json | jq .` now works
+  cleanly). In text mode (default) diagnostics remain on stdout, unchanged
+  from every previous version — verified byte-for-byte identical text-mode
+  output against v1.8.0.
+
+---
+
 ## [1.8.0] - 2026-07-02
 
 ### Added
