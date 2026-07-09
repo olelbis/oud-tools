@@ -204,13 +204,41 @@ python oud_lb_diagram.py --version
 
 ## Testing
 
-A basic unit test suite covers LDIF parsing and model extraction:
+Unit test suites cover LDIF parsing and model extraction (47 tests total, no external dependencies — standard library `unittest` only):
 
 ```bash
-python3 -m unittest test_oud_lb_diagram.py -v
+python3 -m unittest test_oud_ldif_core.py -v      # shared parser (14 tests)
+python3 -m unittest test_oud_lb_diagram.py -v      # diagram tool (33 tests)
+
+# or run everything at once:
+python3 -m unittest discover -p "test_*.py" -v
 ```
 
-No external dependencies — uses only the standard library `unittest` module.
+---
+
+## Architecture: shared core
+
+`oud_lb_diagram.py` and `oud_config_type.py` both build on a shared parsing
+layer, **`oud_ldif_core.py`**, which contains the generic LDIF parser
+(`parse_ldif`) and small DN/attribute utilities (`first`, `cn_of`) — nothing
+specific to proxy configs or any one tool's object model. All three files
+must stay in the same directory:
+
+```
+oud_ldif_core.py   ← shared: parse_ldif, first, cn_of  (no dependency on the other two)
+      ▲                    ▲
+      │                    │
+oud_lb_diagram.py    oud_config_type.py
+(load balancing          (instance
+ diagram)                 classifier)
+```
+
+`oud_lb_diagram.py` also calls into `oud_config_type.py` at runtime for an
+early scope warning (B7) — but that specific link is a **soft** dependency:
+if `oud_config_type.py` isn't present, the check is silently skipped rather
+than failing. `oud_ldif_core.py`, by contrast, is a **hard** dependency for
+both tools — parsing is impossible without it, so its absence fails fast
+with a clear error.
 
 ---
 
@@ -220,7 +248,9 @@ No external dependencies — uses only the standard library `unittest` module.
 |---|---|
 | `oud_lb_diagram.py` | Main script — load balancing diagram |
 | `oud_config_type.py` | OUD instance classifier (Proxy / Directory Server / Hybrid). Run standalone or used automatically by `oud_lb_diagram.py` for an early scope warning. |
-| `test_oud_lb_diagram.py` | Unit test suite (parser + model extraction) |
+| `oud_ldif_core.py` | Shared LDIF parser and DN utilities, used by both tools above |
+| `test_oud_lb_diagram.py` | Unit test suite for the diagram tool (33 tests) |
+| `test_oud_ldif_core.py` | Unit test suite for the shared parser (14 tests) |
 | `README.md` | This file |
 | `CHANGELOG.md` | Version history |
 | `BACKLOG.md` | Planned work |

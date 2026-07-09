@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.8.0] - 2026-07-02
+
+### Added
+- **New shared module: `oud_ldif_core.py` (E2)** — extracted `parse_ldif()`,
+  `first()`, `cn_of()`, and their internal helpers (`_decode_value()`,
+  `_fold_lines()`) out of `oud_lb_diagram.py` into a standalone module with
+  no dependency on any downstream tool. Versioned independently (`1.0.0`).
+- **`test_oud_ldif_core.py`** — 14 dedicated unit tests for the new module
+  (parsing basics, line folding, base64/URL decoding, comments, blank-line
+  handling, DN/cn case normalisation), including a URL-reference test case
+  not previously covered. Combined test count across the repo: 47.
+
+### Changed
+- **`oud_lb_diagram.py`** now imports `parse_ldif`, `first`, `cn_of` from
+  `oud_ldif_core` instead of defining them locally. It requires
+  `oud_ldif_core.py` to be present in the same directory (hard dependency —
+  fails fast with a clear error if missing, since parsing is impossible
+  without it). No behavioural change: verified byte-for-byte identical
+  output against v1.7.0 across all test configs.
+- **`oud_config_type.py`** now imports `parse_ldif`, `first` from
+  `oud_ldif_core` instead of `oud_lb_diagram`. This removes the previous
+  dependency direction where the classifier reached into the diagram tool
+  just to get the parser (noted as a known limitation in the 1.5.0 entry
+  below) — the two tools are now siblings built on the same shared core
+  rather than one depending on the other.
+- `test_oud_lb_diagram.py`'s existing parser-related tests are unchanged
+  and still pass: `oud_lb_diagram.py` re-exports the imported names, so
+  `from oud_lb_diagram import parse_ldif` continues to work exactly as
+  before.
+
+### Notes
+- This closes out the last "Ecosystem" backlog item needed before E3
+  (`oud_backend_report.py`, a companion tool for plain OUD Directory Server
+  configs) can be started on solid footing.
+
+---
+
 ## [1.7.0] - 2026-07-02
 
 ### Added

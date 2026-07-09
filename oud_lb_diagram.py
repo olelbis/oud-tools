@@ -20,133 +20,20 @@ Usage:
 See CHANGELOG.md for version history.
 """
 
-__version__ = "1.7.0"
+__version__ = "1.8.0"
 
 import sys
-import re
 import io
-import base64
 from collections import defaultdict
+
+try:
+    from oud_ldif_core import parse_ldif, first, cn_of
+except ImportError:
+    print('[ERROR] oud_lb_diagram.py requires oud_ldif_core.py in the same directory.')
+    sys.exit(1)
 
 MIN_W = 60   # minimum diagram width
 MAX_W = 200  # safety cap so a single rogue line can't blow up the layout
-
-# ─────────────────────────────────────────────────────────────────────────────
-# LDIF PARSER  (RFC 4511 compliant)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _decode_value(sep, raw_val):
-    """
-    Decode an LDIF attribute value based on separator:
-      ':'  → plain UTF-8 string  (strip leading space)
-      '::' → base64-encoded value (decode to UTF-8, fallback to hex repr)
-      ':<' → URL reference (returned as-is)
-    """
-    val = raw_val.lstrip(' ')
-    if sep == '::':
-        try:
-            return base64.b64decode(val).decode('utf-8')
-        except Exception:
-            return base64.b64decode(val).hex()
-    return val   # plain or URL
-
-
-def _fold_lines(fh):
-    """
-    Generator: yield logical LDIF lines by joining RFC 4511 continuations.
-    A line starting with a single space is a continuation of the previous line
-    (the leading space is stripped before joining).
-    Yields '' for blank lines (entry separators).
-    """
-    current = None
-    for raw in fh:
-        line = raw.rstrip('\r\n')
-        if line.startswith(' '):
-            # continuation — append to current logical line (drop leading space)
-            if current is not None:
-                current += line[1:]
-        else:
-            if current is not None:
-                yield current
-            current = line
-    if current is not None:
-        yield current
-
-
-def parse_ldif(path):
-    """
-    Return dict  dn (normalised to lower-case) -> {attr: [values]}.
-    Handles:
-      - RFC 4511 line folding (continuation lines starting with space)
-      - base64-encoded values  (attr:: <b64>)
-      - URL references         (attr:< <url>)  — stored as-is
-      - Comment lines          (# ...)
-      - Case-insensitive attribute names (stored lower-case)
-      - Case-insensitive DN normalisation (stored lower-case)
-    """
-    entries  = {}
-    dn_key   = None   # lower-case DN used as dict key
-    dn_orig  = None   # original DN casing (for display if needed)
-    current  = defaultdict(list)
-    warnings = []
-
-    with open(path, encoding='utf-8', errors='replace') as fh:
-        for line in _fold_lines(fh):
-
-            # blank line → flush current entry
-            if line.strip() == '':
-                if dn_key:
-                    entries[dn_key] = dict(current)
-                dn_key  = None
-                dn_orig = None
-                current = defaultdict(list)
-                continue
-
-            # comment
-            if line.startswith('#'):
-                continue
-
-            # detect separator by inspecting what follows the FIRST colon
-            # (the previous approach compared '::'/':<' position against the
-            # first ':' position, but since '::' and ':<' always start with
-            # ':', that position is identical — the comparison never fired
-            # and base64/URL values were silently misparsed as plain text)
-            colon_pos = line.find(':')
-            if colon_pos == -1:
-                continue  # malformed line — skip
-            key = line[:colon_pos]
-            rest = line[colon_pos + 1:]
-            if rest.startswith(':'):
-                sep, raw_val = '::', rest[1:]
-            elif rest.startswith('<'):
-                sep, raw_val = ':<', rest[1:]
-            else:
-                sep, raw_val = ':', rest
-
-            key = key.strip().lower()
-            val = _decode_value(sep, raw_val)
-
-            if key == 'dn':
-                dn_orig = val
-                dn_key  = val.lower()   # normalise for consistent lookup
-                current = defaultdict(list)
-            elif dn_key is not None:
-                current[key].append(val)
-            # else: attribute before first dn — skip silently
-
-    # flush last entry (file not ending with blank line)
-    if dn_key and current:
-        entries[dn_key] = dict(current)
-
-    return entries, warnings
-
-
-def first(entry, attr, default=''):
-    return entry.get(attr, [default])[0]
-
-def cn_of(dn):
-    m = re.match(r'cn=([^,]+)', dn, re.IGNORECASE)
-    return m.group(1) if m else dn
 
 # ─────────────────────────────────────────────────────────────────────────────
 # JAVA CLASS CONSTANTS  (fragments matched against ds-cfg-java-class)

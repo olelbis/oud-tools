@@ -10,10 +10,8 @@ up front.
 
 This exists so other tools in this repo (oud_lb_diagram.py's B7 early
 warning, and the planned oud_config_lint.py) can share one classification
-routine instead of re-deriving it. It currently imports the LDIF parser
-from oud_lb_diagram.py (both files must sit in the same directory); a
-future refactor (see BACKLOG.md item E2) will extract a standalone
-oud_ldif_core module so this dependency direction goes away.
+routine instead of re-deriving it. It imports the shared LDIF parser from
+oud_ldif_core.py (both files must sit in the same directory).
 
 Usage:
     python oud_config_type.py <path-to-config.ldif>
@@ -24,14 +22,14 @@ that evidence so the result can be checked by a human rather than trusted
 blindly.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 import sys
 
 try:
-    from oud_lb_diagram import parse_ldif, first
+    from oud_ldif_core import parse_ldif, first
 except ImportError:
-    print('[ERROR] oud_config_type.py must be run from the same directory as oud_lb_diagram.py')
+    print('[ERROR] oud_config_type.py requires oud_ldif_core.py in the same directory.')
     sys.exit(1)
 
 

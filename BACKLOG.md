@@ -23,7 +23,7 @@ Priority: H=High / M=Medium / L=Low
 | # | P | Item |
 |---|---|------|
 | E1 | ~~M~~ | ~~`oud_config_type.py` — generic OUD instance classifier~~ → **done 1.5.0** (categories implemented: OUD Proxy / OUD Directory Server / Hybrid / Inconclusive; Replication Gateway and standalone Global Index Catalog reported as secondary features, not yet distinct primary categories — no confirmed class-name evidence for those as separate instance types) |
-| E2 | L | Extract shared `oud_ldif_core.py` (parse_ldif, DN utils, first/cn_of) out of `oud_lb_diagram.py` so multiple tools can reuse the same parsing layer |
+| E2 | ~~L~~ | ~~Extract shared `oud_ldif_core.py`~~ → **done 1.8.0** — parse_ldif/first/cn_of now shared; oud_config_type.py also migrated off oud_lb_diagram |
 | E3 | L | `oud_backend_report.py` — companion tool for plain OUD Directory Server configs (local backends, indexes, replication), mirroring what `oud_lb_diagram.py` does for proxy configs |
 
 ---
@@ -95,3 +95,4 @@ Priority: H=High / M=Medium / L=Low
 | D20 | 1.5.2 | Split extract_model() into focused per-object extractors (C1) |
 | D21 | 1.6.0 | Unit test suite (30 tests) added; caught & fixed real base64 parsing bug (C3) |
 | D22 | 1.7.0 | `--anonymize` flag with deterministic IP masking (F3) |
+| D23 | 1.8.0 | Extracted shared `oud_ldif_core.py`; oud_config_type.py migrated off oud_lb_diagram (E2) |
