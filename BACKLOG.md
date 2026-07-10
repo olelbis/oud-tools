@@ -24,7 +24,7 @@ Priority: H=High / M=Medium / L=Low
 |---|---|------|
 | E1 | ~~M~~ | ~~`oud_config_type.py` — generic OUD instance classifier~~ → **done 1.5.0** (categories implemented: OUD Proxy / OUD Directory Server / Hybrid / Inconclusive; Replication Gateway and standalone Global Index Catalog reported as secondary features, not yet distinct primary categories — no confirmed class-name evidence for those as separate instance types) |
 | E2 | ~~L~~ | ~~Extract shared `oud_ldif_core.py`~~ → **done 1.8.0** — parse_ldif/first/cn_of now shared; oud_config_type.py also migrated off oud_lb_diagram |
-| E3 | L | `oud_backend_report.py` — companion tool for plain OUD Directory Server configs (local backends, indexes, replication), mirroring what `oud_lb_diagram.py` does for proxy configs |
+| E3 | ~~L~~ | ~~`oud_backend_report.py` — companion tool for plain OUD Directory Server configs~~ → **done (v1.1.0)** — backends, indexes, replication domains, `--anonymize`; tested against a real 380-entry DS config with 102 indexes; public test fixture `config_ds_test.ldif` added |
 
 ---
 
@@ -98,3 +98,5 @@ Priority: H=High / M=Medium / L=Low
 | D23 | 1.8.0 | Extracted shared `oud_ldif_core.py`; oud_config_type.py migrated off oud_lb_diagram (E2) |
 | D24 | 1.9.0 | Disabled WE/extension highlighting extended beyond LB WE (O3) |
 | D25 | 1.9.0 | `--format json` output mode with stdout/stderr split (F4) |
+| D26 | — | `oud_backend_report.py` v1.0.0 — companion tool for Directory Server configs (E3) |
+| D27 | — | `oud_backend_report.py` v1.1.0 — added `--anonymize` (closed gap vs oud_lb_diagram.py); added public `config_ds_test.ldif` fixture |

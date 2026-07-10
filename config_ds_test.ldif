@@ -1,0 +1,181 @@
+# Synthetic OUD Directory Server config fixture for testing oud_backend_report.py.
+# All IPs, base DNs, and identifiers below are fictitious (RFC 5737 / RFC 2606
+# documentation ranges) — safe to commit and share publicly.
+
+dn: cn=config
+objectClass: top
+objectClass: ds-cfg-root-config
+ds-cfg-default-password-policy: cn=Default Password Policy,cn=Password Policies,cn=config
+ds-cfg-idle-time-limit: 0 seconds
+ds-cfg-reject-unauthenticated-requests: false
+ds-cfg-lockdown-mode: false
+ds-cfg-check-schema: true
+cn: config
+
+dn: cn=schema,cn=Workflow Elements,cn=config
+objectClass: ds-cfg-local-backend-workflow-element
+objectClass: ds-cfg-schema-local-backend-workflow-element
+objectClass: ds-cfg-workflow-element
+objectClass: top
+ds-cfg-base-dn: cn=schema
+ds-cfg-writability-mode: enabled
+ds-cfg-enabled: true
+cn: schema
+
+dn: cn=tasks,cn=Workflow Elements,cn=config
+objectClass: ds-cfg-local-backend-workflow-element
+objectClass: ds-cfg-task-local-backend-workflow-element
+objectClass: ds-cfg-workflow-element
+objectClass: top
+ds-cfg-base-dn: cn=tasks
+ds-cfg-task-retention-time: 24 hours
+ds-cfg-enabled: true
+cn: tasks
+
+dn: cn=adminRoot,cn=Workflow Elements,cn=config
+objectClass: ds-cfg-local-backend-workflow-element
+objectClass: ds-cfg-workflow-element
+objectClass: ds-cfg-ldif-local-backend-workflow-element
+objectClass: top
+ds-cfg-base-dn: cn=admin data
+ds-cfg-is-private-backend: true
+ds-cfg-enabled: true
+cn: adminRoot
+
+dn: cn=userRoot,cn=Workflow Elements,cn=config
+objectClass: ds-cfg-local-backend-workflow-element
+objectClass: ds-cfg-workflow-element
+objectClass: ds-cfg-db-local-backend-workflow-element
+objectClass: top
+ds-cfg-db-evictor-lru-only: true
+ds-cfg-entries-compressed: false
+ds-cfg-db-cleaner-min-utilization: 50
+ds-cfg-db-directory-permissions: 700
+ds-cfg-db-log-file-max: 100 megabytes
+ds-cfg-compact-encoding: true
+ds-cfg-db-directory: db
+ds-cfg-base-dn: dc=example,dc=com
+ds-cfg-db-txn-durability: write-to-filesystem
+cn: userRoot
+ds-cfg-enabled: true
+ds-cfg-index-entry-limit: 4000
+ds-cfg-java-class: org.opends.server.workflowelement.localbackend.DBLocalBackendWorkflowElement
+ds-cfg-db-run-cleaner: true
+ds-cfg-writability-mode: enabled
+
+dn: cn=Index,cn=userRoot,cn=Workflow Elements,cn=config
+objectClass: top
+objectClass: ds-cfg-branch
+cn: Index
+
+dn: ds-cfg-attribute=aci,cn=Index,cn=userRoot,cn=Workflow Elements,cn=config
+objectClass: top
+objectClass: ds-cfg-local-db-index
+ds-cfg-attribute: aci
+ds-cfg-index-type: presence
+
+dn: ds-cfg-attribute=cn,cn=Index,cn=userRoot,cn=Workflow Elements,cn=config
+objectClass: top
+objectClass: ds-cfg-local-db-index
+ds-cfg-attribute: cn
+ds-cfg-index-type: equality
+ds-cfg-index-type: substring
+ds-cfg-index-type: presence
+ds-cfg-index-entry-limit: 5000
+
+dn: ds-cfg-attribute=uid,cn=Index,cn=userRoot,cn=Workflow Elements,cn=config
+objectClass: top
+objectClass: ds-cfg-local-db-index
+ds-cfg-attribute: uid
+ds-cfg-index-type: equality
+ds-cfg-index-type: presence
+ds-cfg-index-entry-limit: 5000
+
+dn: ds-cfg-attribute=mail,cn=Index,cn=userRoot,cn=Workflow Elements,cn=config
+objectClass: top
+objectClass: ds-cfg-local-db-index
+ds-cfg-attribute: mail
+ds-cfg-index-type: equality
+ds-cfg-index-entry-limit: 5000
+
+dn: ds-cfg-attribute=sn,cn=Index,cn=userRoot,cn=Workflow Elements,cn=config
+objectClass: top
+objectClass: ds-cfg-local-db-index
+ds-cfg-attribute: sn
+ds-cfg-index-type: equality
+ds-cfg-index-type: substring
+ds-cfg-index-entry-limit: 5000
+
+dn: ds-cfg-attribute=givenName,cn=Index,cn=userRoot,cn=Workflow Elements,cn=config
+objectClass: top
+objectClass: ds-cfg-local-db-index
+ds-cfg-attribute: givenName
+ds-cfg-index-type: equality
+ds-cfg-index-type: substring
+ds-cfg-index-entry-limit: 5000
+
+dn: ds-cfg-attribute=member,cn=Index,cn=userRoot,cn=Workflow Elements,cn=config
+objectClass: top
+objectClass: ds-cfg-local-db-index
+ds-cfg-attribute: member
+ds-cfg-index-type: equality
+ds-cfg-index-entry-limit: 5000
+
+dn: ds-cfg-attribute=entryUUID,cn=Index,cn=userRoot,cn=Workflow Elements,cn=config
+objectClass: top
+objectClass: ds-cfg-local-db-index
+ds-cfg-attribute: entryUUID
+ds-cfg-index-type: equality
+
+dn: ds-cfg-attribute=ds-sync-hist,cn=Index,cn=userRoot,cn=Workflow Elements,cn=config
+objectClass: top
+objectClass: ds-cfg-local-db-index
+ds-cfg-attribute: ds-sync-hist
+ds-cfg-index-type: ordering
+
+dn: cn=domains,cn=Multimaster Synchronization,cn=Synchronization Providers,cn=config
+objectClass: top
+objectClass: ds-cfg-branch
+cn: domains
+
+dn: cn=cn=admin data,cn=domains,cn=Multimaster Synchronization,cn=Synchronization Providers,cn=config
+objectClass: ds-cfg-replication-domain
+objectClass: top
+ds-cfg-window-size: 100
+ds-cfg-base-dn: cn=admin data
+ds-cfg-server-id: 1001
+ds-cfg-group-id: 1
+cn: cn=admin data
+ds-cfg-isolation-policy: reject-all-updates
+ds-cfg-heartbeat-interval: 10000 ms
+ds-cfg-replication-server: 203.0.113.10:8989
+ds-cfg-replication-server: 203.0.113.20:8989
+ds-cfg-solve-conflicts: true
+
+dn: cn=cn=schema,cn=domains,cn=Multimaster Synchronization,cn=Synchronization Providers,cn=config
+objectClass: ds-cfg-replication-domain
+objectClass: top
+ds-cfg-window-size: 100
+ds-cfg-base-dn: cn=schema
+ds-cfg-server-id: 1002
+ds-cfg-group-id: 1
+cn: cn=schema
+ds-cfg-isolation-policy: reject-all-updates
+ds-cfg-heartbeat-interval: 10000 ms
+ds-cfg-replication-server: 203.0.113.10:8989
+ds-cfg-replication-server: 203.0.113.20:8989
+ds-cfg-solve-conflicts: true
+
+dn: cn=dc=example\,dc=com,cn=domains,cn=Multimaster Synchronization,cn=Synchronization Providers,cn=config
+objectClass: ds-cfg-replication-domain
+objectClass: top
+ds-cfg-window-size: 100
+ds-cfg-base-dn: dc=example,dc=com
+ds-cfg-server-id: 1003
+ds-cfg-group-id: 1
+cn: dc=example,dc=com
+ds-cfg-isolation-policy: reject-all-updates
+ds-cfg-heartbeat-interval: 10000 ms
+ds-cfg-replication-server: 203.0.113.10:8989
+ds-cfg-replication-server: 203.0.113.20:8989
+ds-cfg-solve-conflicts: true

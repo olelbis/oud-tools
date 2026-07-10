@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [oud_backend_report.py v1.1.0] - 2026-07-02
+
+### Added
+- **`--anonymize` flag** — replaces replication-server hostnames/IPs with
+  RFC 5737 documentation-range placeholders, preserving the port
+  (`10.179.162.230:8989` → `198.51.100.1:8989`). Same real host always maps
+  to the same placeholder across all replication domains. Closes a real
+  gap: v1.0.0 had no way to safely share a report generated from a real
+  config, unlike `oud_lb_diagram.py` which has had this since v1.7.0.
+- **`config_ds_test.ldif`** — a small, safe, synthetic OUD Directory Server
+  config fixture (19 entries: 1 user-data backend with 9 indexes, 3
+  system/private backends correctly excluded, 3 replication domains with
+  RFC 5737 addresses) for testing and documentation, so real production
+  configs never need to be used or shared for this purpose.
+- **2 new unit tests** for `anonymize_domains()`: host replacement with
+  port preservation, and stable mapping when the same host appears in
+  multiple replication domains. Combined repo test count: 58.
+
+### Notes
+- No change in behaviour when `--anonymize` is not passed.
+- Verified against a real production config: the same host now
+  consistently maps to the same placeholder across all 3 domains that
+  shared it.
+
+---
+
+## [oud_backend_report.py v1.0.0] - 2026-07-02
+
+### Added
+- **New companion tool: `oud_backend_report.py` (E3)** — reads an OUD
+  **Directory Server** config (not proxy) and reports:
+  - Local user-data backends (excludes system/private backends like
+    schema, tasks, admin, trust store, backup, using the same
+    `ds-cfg-is-private-backend` / objectClass distinction `oud_config_type.py`
+    already makes) — base-dn, writability, txn-durability, db-directory,
+    compression, default index-entry-limit, index count, `⚠ DISABLED` marker.
+  - Indexes per backend — attribute, index type(s), entry limit. Tested
+    against a real config with 102 indexes on one backend.
+  - Replication domains — base-dn, server-id, group-id, replication
+    servers, isolation policy, window size.
+  Built on the shared `oud_ldif_core.py` parser, same as the other two
+  tools. Includes a soft, inverted B7-style check: warns if the loaded
+  config looks like an OUD Proxy rather than a Directory Server.
+  `--version` and `--output <file>` supported, same conventions as
+  `oud_lb_diagram.py`.
+- **`test_oud_backend_report.py`** — 4 unit tests (backend extraction,
+  system-backend exclusion, index extraction, replication domain
+  extraction). Combined repo test count: 56.
+
+### Notes
+- Verified end-to-end against a real production Directory Server config
+  (380 entries, 1 user-data backend with 102 indexes, 3 replication
+  domains) — output was clean and correctly excluded internal backends.
+- This closes the last "Ecosystem" backlog item (E3). Only P3 (the
+  planned linter) remains open.
+
+---
+
 ## [1.9.0] - 2026-07-02
 
 ### Added

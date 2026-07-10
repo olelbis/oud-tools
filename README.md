@@ -213,11 +213,12 @@ python oud_lb_diagram.py --version
 
 ## Testing
 
-Unit test suites cover LDIF parsing and model extraction (47 tests total, no external dependencies — standard library `unittest` only):
+Unit test suites cover LDIF parsing, model extraction, and backend/replication reporting (58 tests total, no external dependencies — standard library `unittest` only):
 
 ```bash
-python3 -m unittest test_oud_ldif_core.py -v      # shared parser (14 tests)
-python3 -m unittest test_oud_lb_diagram.py -v      # diagram tool (33 tests)
+python3 -m unittest test_oud_ldif_core.py -v          # shared parser (14 tests)
+python3 -m unittest test_oud_lb_diagram.py -v          # diagram tool (38 tests)
+python3 -m unittest test_oud_backend_report.py -v      # backend report tool (6 tests)
 
 # or run everything at once:
 python3 -m unittest discover -p "test_*.py" -v
@@ -227,27 +228,32 @@ python3 -m unittest discover -p "test_*.py" -v
 
 ## Architecture: shared core
 
-`oud_lb_diagram.py` and `oud_config_type.py` both build on a shared parsing
-layer, **`oud_ldif_core.py`**, which contains the generic LDIF parser
-(`parse_ldif`) and small DN/attribute utilities (`first`, `cn_of`) — nothing
-specific to proxy configs or any one tool's object model. All three files
-must stay in the same directory:
+`oud_lb_diagram.py`, `oud_config_type.py`, and `oud_backend_report.py` all
+build on a shared parsing layer, **`oud_ldif_core.py`**, which contains the
+generic LDIF parser (`parse_ldif`) and small DN/attribute utilities
+(`first`, `cn_of`) — nothing specific to any one tool's object model. All
+files must stay in the same directory:
 
 ```
-oud_ldif_core.py   ← shared: parse_ldif, first, cn_of  (no dependency on the other two)
-      ▲                    ▲
-      │                    │
-oud_lb_diagram.py    oud_config_type.py
-(load balancing          (instance
- diagram)                 classifier)
+                    oud_ldif_core.py
+        (shared: parse_ldif, first, cn_of — no dependency on the tools below)
+                 ▲         ▲          ▲
+                 │         │          │
+      oud_lb_diagram.py  oud_config_type.py  oud_backend_report.py
+      (proxy load          (instance          (Directory Server
+       balancing            classifier)        backend/replication
+       diagram)                                report)
 ```
 
-`oud_lb_diagram.py` also calls into `oud_config_type.py` at runtime for an
-early scope warning (B7) — but that specific link is a **soft** dependency:
-if `oud_config_type.py` isn't present, the check is silently skipped rather
-than failing. `oud_ldif_core.py`, by contrast, is a **hard** dependency for
-both tools — parsing is impossible without it, so its absence fails fast
-with a clear error.
+`oud_lb_diagram.py` and `oud_backend_report.py` each call into
+`oud_config_type.py` at runtime for an early, direction-appropriate scope
+warning (B7) — `oud_lb_diagram.py` warns if the config doesn't look like a
+Proxy, `oud_backend_report.py` warns if it doesn't look like a Directory
+Server. Both links are **soft** dependencies: if `oud_config_type.py` isn't
+present, the check is silently skipped rather than failing.
+`oud_ldif_core.py`, by contrast, is a **hard** dependency for all three
+tools — parsing is impossible without it, so its absence fails fast with a
+clear error.
 
 ---
 
@@ -255,10 +261,13 @@ with a clear error.
 
 | File | Description |
 |---|---|
-| `oud_lb_diagram.py` | Main script — load balancing diagram |
-| `oud_config_type.py` | OUD instance classifier (Proxy / Directory Server / Hybrid). Run standalone or used automatically by `oud_lb_diagram.py` for an early scope warning. |
-| `oud_ldif_core.py` | Shared LDIF parser and DN utilities, used by both tools above |
-| `test_oud_lb_diagram.py` | Unit test suite for the diagram tool (33 tests) |
+| `oud_lb_diagram.py` | Load balancing diagram for OUD **Proxy** configs |
+| `oud_backend_report.py` | Backend/index/replication report for OUD **Directory Server** configs |
+| `oud_config_type.py` | OUD instance classifier (Proxy / Directory Server / Hybrid). Run standalone or used automatically by the two tools above for an early scope warning. |
+| `oud_ldif_core.py` | Shared LDIF parser and DN utilities, used by all three tools above |
+| `test_oud_lb_diagram.py` | Unit test suite for the diagram tool (38 tests) |
+| `test_oud_backend_report.py` | Unit test suite for the backend report tool (6 tests) |
+| `config_ds_test.ldif` | Safe, synthetic OUD Directory Server config fixture for testing `oud_backend_report.py` |
 | `test_oud_ldif_core.py` | Unit test suite for the shared parser (14 tests) |
 | `README.md` | This file |
 | `CHANGELOG.md` | Version history |
@@ -275,3 +284,30 @@ python oud_config_type.py <path-to-config.ldif>
 ```
 
 Reports one of: `OUD Proxy`, `OUD Directory Server`, `Hybrid` (both proxy-LB and a real local data backend present — unusual), or `Unknown / inconclusive`, plus the matching DNs as evidence. If placed in the same directory as `oud_lb_diagram.py`, the diagram tool calls it automatically and prints a `[WARN]` up front when the config doesn't look like a Proxy instance.
+
+---
+
+## Companion tool: `oud_backend_report.py`
+
+Reads an OUD **Directory Server** config (not proxy) and reports local user-data backends, their indexes, and replication domains — the counterpart to `oud_lb_diagram.py` for non-proxy instances.
+
+```bash
+python oud_backend_report.py <path-to-config.ldif>
+python oud_backend_report.py --version
+python oud_backend_report.py <config> --output <file>
+python oud_backend_report.py <config> --anonymize    # mask replication-server IPs with RFC 5737 placeholders
+```
+
+Reports:
+- **Local data backends** — base-dn, writability, txn-durability, db-directory, compression, default index-entry-limit, index count, and a `⚠ DISABLED` marker if applicable. System/private backends (schema, tasks, admin, trust store, backup) are excluded automatically, same distinction `oud_config_type.py` uses for classification.
+- **Indexes per backend** — attribute, index type(s), entry limit.
+- **Replication domains** — base-dn, server-id, group-id, replication servers, isolation policy, window size.
+
+Like `oud_lb_diagram.py`, it calls into `oud_config_type.py` automatically (soft dependency) and warns if the loaded config looks like a Proxy rather than a Directory Server.
+
+A safe, synthetic test fixture is included — `config_ds_test.ldif` (19 entries, RFC 5737 addresses, 1 user-data backend, 9 indexes, 3 replication domains) — so you can try the tool without needing a real config:
+
+```bash
+python oud_backend_report.py config_ds_test.ldif
+```
+
