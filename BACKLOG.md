@@ -64,7 +64,7 @@ Priority: H=High / M=Medium / L=Low
 
 | # | P | Item |
 |---|---|------|
-| P3 | L | **Planned, not started.** Second tool: `oud_config_lint.py` — validator/linter for OUD proxy configs. Scope TBD: candidate checks = orphan/broken DN references (reuses existing parser), SSL/timeout/pool-size best practices, disabled-but-referenced WEs, unbalanced failover priorities. |
+| P3 | ~~L~~ | ~~`oud_config_lint.py` — validator/linter for OUD proxy configs~~ → **done v1.0.0** — 9 rules across proxy + DS profiles, ERROR/WARNING/INFO severity, JSON output, CI-friendly exit code |
 
 ---
 
@@ -100,3 +100,4 @@ Priority: H=High / M=Medium / L=Low
 | D25 | 1.9.0 | `--format json` output mode with stdout/stderr split (F4) |
 | D26 | — | `oud_backend_report.py` v1.0.0 — companion tool for Directory Server configs (E3) |
 | D27 | — | `oud_backend_report.py` v1.1.0 — added `--anonymize` (closed gap vs oud_lb_diagram.py); added public `config_ds_test.ldif` fixture |
+| D28 | — | `oud_config_lint.py` v1.0.0 — validator/linter, 9 rules across both profiles (P3) |

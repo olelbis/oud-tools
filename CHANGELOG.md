@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [oud_config_lint.py v1.0.0] - 2026-07-02
+
+### Added
+- **New tool: `oud_config_lint.py` (P3)** — validator/linter for OUD Proxy
+  and Directory Server configs. Runs a rule-based set of checks and prints
+  findings grouped by severity (`ERROR`/`WARNING`/`INFO`). Uses
+  `oud_config_type.py` to decide which rule set(s) apply, and reuses the
+  object models already built by `oud_lb_diagram.py` (`extract_model`) and
+  `oud_backend_report.py` (`extract_backends`, `extract_replication_domains`)
+  rather than re-deriving them.
+
+  **Proxy rules:**
+  - `P-REF-1` (ERROR) — broken workflow-element/extension references
+  - `P-ARCH-1` (WARNING) — workflow element unreachable from any network group
+  - `P-ARCH-2` (WARNING) — disabled component still reachable/referenced
+  - `P-SEC-1` (WARNING) — `ssl-trust-all: true` (backend cert not validated)
+  - `P-SEC-2` (INFO) — ssl-policy not `always`
+  - `P-PERF-1` (WARNING) — connection pool size missing or zero
+  - `P-PERF-2` (INFO) — connect/read timeout set to 0 (no timeout)
+  - `P-HYG-1` (INFO) — duplicate CNs (reuses B5's `find_duplicate_cn_warnings`)
+  - `P-HYG-2` (WARNING) — network group with no workflow configured
+
+  **Directory Server rules:**
+  - `D-ARCH-1` (INFO) — backend with no replication domain (standalone?)
+  - `D-ARCH-2` (WARNING) — replication domain with no matching local backend
+  - `D-HYG-1` (WARNING) — duplicate server-id across replication domains
+  - `D-PERF-1` (INFO) — commonly-queried attribute (uid/mail) with no index
+    at all (phrased as a suggestion — actual query patterns aren't visible
+    from config alone)
+
+  Supports `--output <file>`, `--format json`, `--version`. Exit code is
+  `1` if any ERROR-severity finding is present, `0` otherwise — suitable
+  for CI pipelines.
+- **`test_oud_config_lint.py`** — 8 unit tests covering every rule category
+  on both profiles. Combined repo test count: 66.
+
+### Notes
+- Verified against real configs: correctly flagged `ssl-trust-all: true`
+  present on all 6 extensions in the real proxy config, and produced zero
+  findings on the real, well-formed Directory Server config.
+- This closes the last open backlog item (P3). The backlog is now fully
+  cleared except for longer-term / speculative ideas.
+
+---
+
 ## [oud_backend_report.py v1.1.0] - 2026-07-02
 
 ### Added

@@ -213,12 +213,13 @@ python oud_lb_diagram.py --version
 
 ## Testing
 
-Unit test suites cover LDIF parsing, model extraction, and backend/replication reporting (58 tests total, no external dependencies — standard library `unittest` only):
+Unit test suites cover LDIF parsing, model extraction, and backend/replication reporting (66 tests total, no external dependencies — standard library `unittest` only):
 
 ```bash
 python3 -m unittest test_oud_ldif_core.py -v          # shared parser (14 tests)
 python3 -m unittest test_oud_lb_diagram.py -v          # diagram tool (38 tests)
 python3 -m unittest test_oud_backend_report.py -v      # backend report tool (6 tests)
+python3 -m unittest test_oud_config_lint.py -v          # config linter (8 tests)
 
 # or run everything at once:
 python3 -m unittest discover -p "test_*.py" -v
@@ -228,30 +229,38 @@ python3 -m unittest discover -p "test_*.py" -v
 
 ## Architecture: shared core
 
-`oud_lb_diagram.py`, `oud_config_type.py`, and `oud_backend_report.py` all
-build on a shared parsing layer, **`oud_ldif_core.py`**, which contains the
-generic LDIF parser (`parse_ldif`) and small DN/attribute utilities
-(`first`, `cn_of`) — nothing specific to any one tool's object model. All
-files must stay in the same directory:
+`oud_lb_diagram.py`, `oud_config_type.py`, `oud_backend_report.py`, and
+`oud_config_lint.py` all build on a shared parsing layer,
+**`oud_ldif_core.py`**, which contains the generic LDIF parser
+(`parse_ldif`) and small DN/attribute utilities (`first`, `cn_of`) —
+nothing specific to any one tool's object model. All files must stay in
+the same directory:
 
 ```
-                    oud_ldif_core.py
-        (shared: parse_ldif, first, cn_of — no dependency on the tools below)
-                 ▲         ▲          ▲
-                 │         │          │
-      oud_lb_diagram.py  oud_config_type.py  oud_backend_report.py
-      (proxy load          (instance          (Directory Server
-       balancing            classifier)        backend/replication
-       diagram)                                report)
+                              oud_ldif_core.py
+              (shared: parse_ldif, first, cn_of — no dependency on the tools below)
+                 ▲         ▲              ▲              ▲
+                 │         │              │              │
+      oud_lb_diagram.py  oud_config_type.py  oud_backend_report.py  oud_config_lint.py
+      (proxy load          (instance          (Directory Server      (validator —
+       balancing            classifier)        backend/replication    imports models from
+       diagram)                                 report)                the two tools above)
 ```
 
 `oud_lb_diagram.py` and `oud_backend_report.py` each call into
 `oud_config_type.py` at runtime for an early, direction-appropriate scope
 warning (B7) — `oud_lb_diagram.py` warns if the config doesn't look like a
 Proxy, `oud_backend_report.py` warns if it doesn't look like a Directory
-Server. Both links are **soft** dependencies: if `oud_config_type.py` isn't
-present, the check is silently skipped rather than failing.
-`oud_ldif_core.py`, by contrast, is a **hard** dependency for all three
+Server. `oud_config_lint.py` goes further: it imports `extract_model` from
+`oud_lb_diagram.py` and `extract_backends`/`extract_replication_domains`
+from `oud_backend_report.py` directly, reusing their object models instead
+of re-deriving them, and uses `oud_config_type.py` to decide which rule
+set(s) to run.
+
+All cross-tool links (`oud_config_type.py`, and the model-reuse imports in
+`oud_config_lint.py`) are **soft** dependencies: if the imported file isn't
+present, that part is silently skipped rather than failing.
+`oud_ldif_core.py`, by contrast, is a **hard** dependency for all four
 tools — parsing is impossible without it, so its absence fails fast with a
 clear error.
 
@@ -263,10 +272,12 @@ clear error.
 |---|---|
 | `oud_lb_diagram.py` | Load balancing diagram for OUD **Proxy** configs |
 | `oud_backend_report.py` | Backend/index/replication report for OUD **Directory Server** configs |
-| `oud_config_type.py` | OUD instance classifier (Proxy / Directory Server / Hybrid). Run standalone or used automatically by the two tools above for an early scope warning. |
+| `oud_config_lint.py` | Validator/linter for both Proxy and Directory Server configs |
+| `oud_config_type.py` | OUD instance classifier (Proxy / Directory Server / Hybrid). Run standalone or used automatically by the tools above for an early scope warning. |
 | `oud_ldif_core.py` | Shared LDIF parser and DN utilities, used by all three tools above |
 | `test_oud_lb_diagram.py` | Unit test suite for the diagram tool (38 tests) |
 | `test_oud_backend_report.py` | Unit test suite for the backend report tool (6 tests) |
+| `test_oud_config_lint.py` | Unit test suite for the config linter (8 tests) |
 | `config_ds_test.ldif` | Safe, synthetic OUD Directory Server config fixture for testing `oud_backend_report.py` |
 | `test_oud_ldif_core.py` | Unit test suite for the shared parser (14 tests) |
 | `README.md` | This file |
@@ -309,5 +320,47 @@ A safe, synthetic test fixture is included — `config_ds_test.ldif` (19 entries
 
 ```bash
 python oud_backend_report.py config_ds_test.ldif
+```
+
+---
+
+## Companion tool: `oud_config_lint.py`
+
+Validator/linter for both OUD Proxy and Directory Server configs. Uses `oud_config_type.py` to detect the profile and runs the matching rule set(s); on a `Hybrid` config, runs both.
+
+```bash
+python oud_config_lint.py <path-to-config.ldif>
+python oud_config_lint.py --version
+python oud_config_lint.py <config> --output <file>
+python oud_config_lint.py <config> --format json
+```
+
+Findings are grouped by severity: `ERROR`, `WARNING`, `INFO`. **Exit code is `1` if any ERROR-severity finding is present, `0` otherwise** — safe to use as a CI gate.
+
+**Proxy rules:**
+
+| Rule | Severity | Checks |
+|---|---|---|
+| `P-REF-1` | ERROR | Broken workflow-element / extension references |
+| `P-ARCH-1` | WARNING | Workflow element unreachable from any network group |
+| `P-ARCH-2` | WARNING | Disabled component still reachable/referenced |
+| `P-SEC-1` | WARNING | `ssl-trust-all: true` (backend certificate not validated) |
+| `P-SEC-2` | INFO | ssl-policy not `always` |
+| `P-PERF-1` | WARNING | Connection pool size missing or zero |
+| `P-PERF-2` | INFO | Connect/read timeout set to 0 (no timeout) |
+| `P-HYG-1` | INFO | Duplicate CNs across workflow elements |
+| `P-HYG-2` | WARNING | Network group with no workflow configured |
+
+**Directory Server rules:**
+
+| Rule | Severity | Checks |
+|---|---|---|
+| `D-ARCH-1` | INFO | Backend with no replication domain (standalone?) |
+| `D-ARCH-2` | WARNING | Replication domain with no matching local backend |
+| `D-HYG-1` | WARNING | Duplicate server-id across replication domains |
+| `D-PERF-1` | INFO | Commonly-queried attribute (`uid`/`mail`) with no index at all — a suggestion, not a confirmed usage pattern |
+
+```bash
+python oud_config_lint.py config_ds_test.ldif   # clean config → 0 findings
 ```
 
