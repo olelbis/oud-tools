@@ -21,7 +21,7 @@ Usage:
 See CHANGELOG.md for version history.
 """
 
-__version__ = "1.9.0"
+__version__ = "1.9.1"
 
 import sys
 import io
@@ -274,7 +274,7 @@ def disabled_marker(*enabled_flags):
     never silently indistinguishable from an active one in the diagram.
     """
     if any(str(f).lower() == 'false' for f in enabled_flags):
-        return '  ⚠ DISABLED'
+        return '  !! DISABLED'
     return ''
 
 
@@ -449,7 +449,7 @@ def build_legend_section():
         'ROUND-ROBIN    Cycles through available routes in order.',
         '└─ <node>      Leaf node = backend proxy WE resolved to IP:port.',
         'cred-mode      How client credentials are forwarded to the backend.',
-        '⚠ DISABLED     ds-cfg-enabled: false on this WE or its backend extension — inactive.',
+        '!! DISABLED    ds-cfg-enabled: false on this WE or its backend extension — inactive.',
     ]:
         sec.add(l)
     return sec

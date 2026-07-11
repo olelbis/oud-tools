@@ -17,8 +17,12 @@ Usage:
     python oud_config_lint.py <config> --output <file>
     python oud_config_lint.py <config> --format json
 
-Exit code: 1 if any ERROR-severity finding is present, 0 otherwise
-(0 findings or only WARNING/INFO) — suitable for CI use.
+Exit codes:
+    0 — rules ran, no ERROR-severity findings (WARNING/INFO are fine)
+    1 — at least one ERROR-severity finding
+    2 — NO rules were run (profile could not be determined, or the required
+        tool modules were missing) — distinct from 0 so a CI pipeline can
+        never pass green on zero executed checks.
 
 Scope (v1.0.0):
   Proxy rules   — broken references, orphaned/unreachable workflow
@@ -32,13 +36,13 @@ Scope (v1.0.0):
                   patterns aren't visible from config alone).
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 import sys
 import json
 
 try:
-    from oud_ldif_core import parse_ldif, first, cn_of
+    from oud_ldif_core import parse_ldif, first
 except ImportError:
     print('[ERROR] oud_config_lint.py requires oud_ldif_core.py in the same directory.')
     sys.exit(1)
@@ -144,6 +148,13 @@ def lint_proxy(entries, model):
             findings.append(Finding('P-ARCH-2', SEV_WARNING, 'architecture',
                 f'proxy-we "{pwe["cn"]}" is disabled (or its extension is) but still reachable/referenced',
                 pwe['cn']))
+    for lb_dn, lb in model['lb_we'].items():
+        if lb_dn not in reachable:
+            continue  # unreachable is P-ARCH-1's job, don't double-report
+        if lb.get('enabled', 'true').lower() == 'false':
+            findings.append(Finding('P-ARCH-2', SEV_WARNING, 'architecture',
+                f'LB workflow element "{lb["cn"]}" is disabled but still reachable/referenced',
+                lb['cn']))
 
     # P-SEC-1 / P-SEC-2: SSL settings
     for ext_dn, ext in model['extensions'].items():
@@ -243,8 +254,12 @@ def lint_ds(entries):
 # REPORT
 # ─────────────────────────────────────────────────────────────────────────────
 
-def print_report(findings, profile, confidence, file=None):
+def print_report(findings, profile, confidence, rules_ran=True, file=None):
     print(f'\n[+] Detected profile: {profile}  (confidence: {confidence})', file=file)
+    if not rules_ran:
+        print('[!] NO RULES WERE RUN — the profile could not be determined or the '
+              'required tool modules are missing. This is NOT a clean result.', file=file)
+        return
     if not findings:
         print('[+] No findings. Clean bill of health for the checks in this version.', file=file)
         return
@@ -260,7 +275,11 @@ def print_report(findings, profile, confidence, file=None):
         print(f'\n{sev} ({len(items)})', file=file)
         print('-' * 60, file=file)
         for f in items:
-            print(f'  [{f.rule_id}] {f.message}', file=file)
+            # show ref for grep-ability, unless it's already part of the message
+            ref_s = ''
+            if f.ref and str(f.ref) not in f.message:
+                ref_s = f'  (ref: {f.ref})'
+            print(f'  [{f.rule_id}] {f.message}{ref_s}', file=file)
 
     print(f'\n[+] Total: {len(findings)} finding(s)  '
           f'({len(by_sev[SEV_ERROR])} error, {len(by_sev[SEV_WARNING])} warning, '
@@ -325,14 +344,17 @@ def main():
         profile, confidence = 'Unknown (oud_config_type.py not available)', 'low'
 
     findings = []
+    rules_ran = False
     if profile.startswith('OUD Proxy') or profile.startswith('Hybrid'):
         if extract_model:
             findings += lint_proxy(entries, extract_model(entries))
+            rules_ran = True
         else:
             print('[WARN] oud_lb_diagram.py not available — proxy rules skipped', file=diag)
     if profile.startswith('OUD Directory Server') or profile.startswith('Hybrid'):
         if extract_backends:
             findings += lint_ds(entries)
+            rules_ran = True
         else:
             print('[WARN] oud_backend_report.py not available — DS rules skipped', file=diag)
     if profile.startswith('Unknown'):
@@ -345,6 +367,7 @@ def main():
         payload = {
             'tool': 'oud_config_lint.py', 'tool_version': __version__,
             'source_file': path, 'profile': profile, 'confidence': confidence,
+            'rules_ran': rules_ran,
             'findings': [f.to_dict() for f in findings],
         }
         text = json.dumps(payload, indent=2, ensure_ascii=False)
@@ -357,12 +380,19 @@ def main():
     else:
         if args['output']:
             with open(args['output'], 'w', encoding='utf-8') as out:
-                print_report(findings, profile, confidence, file=out)
+                print_report(findings, profile, confidence, rules_ran=rules_ran, file=out)
             print(f'[+] Report written to: {args["output"]}', file=diag)
         else:
-            print_report(findings, profile, confidence)
+            print_report(findings, profile, confidence, rules_ran=rules_ran)
 
-    sys.exit(1 if has_error else 0)
+    # Exit codes:
+    #   0 — rules ran, no ERROR findings
+    #   1 — at least one ERROR finding
+    #   2 — NO rules were run (unknown profile or missing tool modules):
+    #       distinct from 0 so a CI pipeline can't pass green on zero checks
+    if has_error:
+        sys.exit(1)
+    sys.exit(0 if rules_ran else 2)
 
 
 if __name__ == '__main__':

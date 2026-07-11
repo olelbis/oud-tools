@@ -7,7 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [oud_config_lint.py v1.0.0] - 2026-07-02
+## [Review fixes: lint v1.1.0, lb_diagram v1.9.1, backend_report v1.1.1] - 2026-07-10
+
+Batch of fixes from a project-wide severe review (all claims re-verified
+against real files: no fabrications found; the items below are real defects
+the review surfaced).
+
+### Fixed
+- **`oud_config_lint.py` v1.1.0 — misleading "clean bill of health" on
+  unknown profile.** When the profile could not be determined (or the tool
+  modules were missing), zero rules were executed but the tool still
+  printed "No findings. Clean bill of health" and exited `0` — a CI
+  pipeline could pass green on zero checks. Now: explicit
+  `[!] NO RULES WERE RUN — ... This is NOT a clean result.` message, a
+  `rules_ran` field in the JSON payload, and a dedicated **exit code `2`**
+  (0 = clean, 1 = ERROR findings, 2 = nothing was checked).
+- **`oud_config_lint.py` — `Finding.ref` was collected but never shown** in
+  the text report (only in JSON). Now displayed as `(ref: ...)` when it is
+  not already part of the message.
+- **`oud_config_lint.py` — P-ARCH-2 gap:** only disabled proxy WEs were
+  flagged; disabled-but-reachable **LB workflow elements** are now flagged
+  too (unreachable ones remain P-ARCH-1's job, no double-reporting).
+- **`oud_lb_diagram.py` v1.9.1 / `oud_backend_report.py` v1.1.1 — `⚠` is
+  double-width in some terminals/fonts**, while the box layout counts it as
+  one column via `len()`, so rows carrying the marker could visually
+  misalign by one character. Marker changed to plain-ASCII `!! DISABLED`
+  (width-safe); legend updated accordingly.
+- **Unused imports removed:** `cn_of` in `oud_config_lint.py` and
+  `oud_backend_report.py`.
+- **CHANGELOG dates corrected.** Entries from 1.6.0 onward were all stamped
+  `2026-07-02` regardless of when the work actually happened. Restored real
+  dates from the release-notes file timestamps: 1.6.0 → 07-08;
+  1.7.0/1.8.0/1.9.0 → 07-09; backend_report v1.0.0/v1.1.0 and
+  config_lint v1.0.0 → 07-10.
+- **README example output was stale** — the legend in the sample diagram
+  was missing the DISABLED marker line added in 1.9.0; refreshed to match
+  the current marker (`!! DISABLED`).
+- **Orphan release notes cleaned up:** `RELEASE_NOTES_backend_report_v1.0.0.md`
+  referred to a release that was never published (v1.0.0 was folded directly
+  into the v1.1.0 release). Removed. Retroactive notes files added for
+  v1.9.0 and backend_report v1.1.0 to keep the one-file-per-release
+  convention consistent.
+
+### Added
+- **`check_changelog.py`** — guard script for the exact documentation bug
+  that recurred six times during development: a `## [version]` header being
+  lost during an edit, leaving a `---` separator followed by orphaned
+  `### ...` content. Validates header presence and format; exit 1 on any
+  problem. Run it before committing CHANGELOG changes (manually, as a
+  pre-commit hook, or in CI).
+
+---
+
+## [oud_config_lint.py v1.0.0] - 2026-07-10
 
 ### Added
 - **New tool: `oud_config_lint.py` (P3)** — validator/linter for OUD Proxy
@@ -52,7 +104,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [oud_backend_report.py v1.1.0] - 2026-07-02
+## [oud_backend_report.py v1.1.0] - 2026-07-10
 
 ### Added
 - **`--anonymize` flag** — replaces replication-server hostnames/IPs with
@@ -78,7 +130,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [oud_backend_report.py v1.0.0] - 2026-07-02
+## [oud_backend_report.py v1.0.0] - 2026-07-10
 
 ### Added
 - **New companion tool: `oud_backend_report.py` (E3)** — reads an OUD
@@ -110,7 +162,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.9.0] - 2026-07-02
+## [1.9.0] - 2026-07-09
 
 ### Added
 - **`--format json` flag (F4)** — outputs the full parsed model as
@@ -145,7 +197,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.8.0] - 2026-07-02
+## [1.8.0] - 2026-07-09
 
 ### Added
 - **New shared module: `oud_ldif_core.py` (E2)** — extracted `parse_ldif()`,
@@ -182,7 +234,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.7.0] - 2026-07-02
+## [1.7.0] - 2026-07-09
 
 ### Added
 - **`--anonymize` flag (F3)** — replaces real backend IPs with placeholders
@@ -206,7 +258,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.6.0] - 2026-07-02
+## [1.6.0] - 2026-07-08
 
 ### Added
 - **`test_oud_lb_diagram.py` (C3)** — basic unit test suite (30 tests,

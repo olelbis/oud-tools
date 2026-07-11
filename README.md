@@ -67,7 +67,7 @@ The script reads the OUD proxy `config.ldif` file and:
 7. **Parses LDIF robustly** — handles RFC 4511 line folding (continuation lines), base64-encoded values, and case-insensitive DN references
 8. **Warns on unresolved references** — flags any workflow-element or extension DN that cannot be resolved in the parsed config
 9. **Can anonymize backend IPs on demand** (`--anonymize`) — replaces real IPs with stable RFC 5737 documentation-range placeholders, useful when sharing diagrams outside the team
-10. **Highlights disabled components** — proxy WEs and their backend extensions each track their own `ds-cfg-enabled` state; either one being `false` shows a `⚠ DISABLED` marker in both the workflow tree and the backend servers table
+10. **Highlights disabled components** — proxy WEs and their backend extensions each track their own `ds-cfg-enabled` state; either one being `false` shows a `!! DISABLED` marker in both the workflow tree and the backend servers table
 11. **Can emit structured JSON** (`--format json`) instead of the ASCII diagram, for scripting/automation — diagnostics go to stderr so stdout stays pure, pipeable JSON
 
 ---
@@ -142,6 +142,7 @@ The script reads the OUD proxy `config.ldif` file and:
 │  ROUND-ROBIN    Cycles through available routes in order.                                                  │
 │  └─ <node>      Leaf node = backend proxy WE resolved to IP:port.                                          │
 │  cred-mode      How client credentials are forwarded to the backend.                                       │
+│  !! DISABLED    ds-cfg-enabled: false on this WE or its backend extension — inactive.                      │
 └────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -310,7 +311,7 @@ python oud_backend_report.py <config> --anonymize    # mask replication-server I
 ```
 
 Reports:
-- **Local data backends** — base-dn, writability, txn-durability, db-directory, compression, default index-entry-limit, index count, and a `⚠ DISABLED` marker if applicable. System/private backends (schema, tasks, admin, trust store, backup) are excluded automatically, same distinction `oud_config_type.py` uses for classification.
+- **Local data backends** — base-dn, writability, txn-durability, db-directory, compression, default index-entry-limit, index count, and a `!! DISABLED` marker if applicable. System/private backends (schema, tasks, admin, trust store, backup) are excluded automatically, same distinction `oud_config_type.py` uses for classification.
 - **Indexes per backend** — attribute, index type(s), entry limit.
 - **Replication domains** — base-dn, server-id, group-id, replication servers, isolation policy, window size.
 
@@ -335,7 +336,13 @@ python oud_config_lint.py <config> --output <file>
 python oud_config_lint.py <config> --format json
 ```
 
-Findings are grouped by severity: `ERROR`, `WARNING`, `INFO`. **Exit code is `1` if any ERROR-severity finding is present, `0` otherwise** — safe to use as a CI gate.
+Findings are grouped by severity: `ERROR`, `WARNING`, `INFO`. Exit codes are CI-friendly:
+
+| Exit code | Meaning |
+|---|---|
+| `0` | Rules ran, no ERROR-severity findings (WARNING/INFO are fine) |
+| `1` | At least one ERROR-severity finding |
+| `2` | **No rules were run** (profile undetermined or tool modules missing) — distinct from `0` so a pipeline can never pass green on zero executed checks |
 
 **Proxy rules:**
 
@@ -343,7 +350,7 @@ Findings are grouped by severity: `ERROR`, `WARNING`, `INFO`. **Exit code is `1`
 |---|---|---|
 | `P-REF-1` | ERROR | Broken workflow-element / extension references |
 | `P-ARCH-1` | WARNING | Workflow element unreachable from any network group |
-| `P-ARCH-2` | WARNING | Disabled component still reachable/referenced |
+| `P-ARCH-2` | WARNING | Disabled component (proxy WE, its extension, or LB WE) still reachable/referenced |
 | `P-SEC-1` | WARNING | `ssl-trust-all: true` (backend certificate not validated) |
 | `P-SEC-2` | INFO | ssl-policy not `always` |
 | `P-PERF-1` | WARNING | Connection pool size missing or zero |

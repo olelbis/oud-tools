@@ -72,6 +72,15 @@ Priority: H=High / M=Medium / L=Low
 
 | # | Version | Item |
 |---|---------|------|
+| R1 | lint 1.1.0 | Review fix: exit code 2 + explicit message when zero rules run (was: false "clean" + exit 0) |
+| R2 | lint 1.1.0 | Review fix: Finding.ref now shown in text report when it adds information |
+| R3 | lint 1.1.0 | Review fix: P-ARCH-2 extended to disabled-but-reachable LB WEs |
+| R4 | lint 1.1.0, report 1.1.1 | Review fix: unused `cn_of` imports removed |
+| R5 | diagram 1.9.1, report 1.1.1 | Review fix: `⚠` (double-width glyph) → `!!` ASCII marker, width-safe |
+| R6 | — | Review fix: CHANGELOG dates corrected to real work dates (1.6.0→07-08, 1.7-1.9→07-09, new tools→07-10) |
+| R7 | — | Review fix: README stale example legend refreshed; lint exit-code table added |
+| R8 | — | Review fix: orphan RELEASE_NOTES_backend_report_v1.0.0.md removed; retroactive notes for v1.9.0 and backend_report v1.1.0 added |
+| R9 | — | Review fix: `check_changelog.py` guard added for the recurring lost-header bug (caught it 0 times on the new entry — first clean edit) |
 | D1 | 1.0.0 | Generic tree exploration (any depth, no hardcoded structure) |
 | D2 | 1.0.0 | Per-operation weights and priorities |
 | D3 | 1.0.0 | Backend servers summary table |

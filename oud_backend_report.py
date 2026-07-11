@@ -22,12 +22,12 @@ backends (schema, tasks, monitor, backup, trust store, admin) are skipped,
 same distinction oud_config_type.py already makes for classification.
 """
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 import sys
 
 try:
-    from oud_ldif_core import parse_ldif, first, cn_of
+    from oud_ldif_core import parse_ldif, first
 except ImportError:
     print('[ERROR] oud_backend_report.py requires oud_ldif_core.py in the same directory.')
     sys.exit(1)
@@ -161,7 +161,7 @@ def build_backends_section(entries, backends):
         return sec
     for dn, b in sorted(backends.items(), key=lambda x: x[1]['cn']):
         idx_count = len(extract_indexes(entries, dn, b['cn']))
-        marker = '  ⚠ DISABLED' if b['enabled'].lower() == 'false' else ''
+        marker = '  !! DISABLED' if b['enabled'].lower() == 'false' else ''
         sec.add(f'{b["cn"]}  base-dn:{b["base_dn"]}{marker}')
         sec.add(f'  writability:{b["writability"]}  txn-durability:{b["txn_durability"]}  '
                  f'db-dir:{b["db_directory"]}  compressed:{b["entries_compressed"]}  '
